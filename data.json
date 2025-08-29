@@ -1,0 +1,13 @@
+{
+  "products": [],
+  "categories": [
+    { "id": "cat_law", "name": "Law", "icon": "⚖️", "color": "#F59E0B", "customIcon": null },
+    { "id": "cat_realestate", "name": "Real Estate", "icon": "🏠", "color": "#10B981", "customIcon": null },
+    { "id": "cat_health", "name": "Healthcare", "icon": "💊", "color": "#3B82F6", "customIcon": null },
+    { "id": "cat_tech", "name": "Tech", "icon": "💻", "color": "#8B5CF6", "customIcon": null },
+    { "id": "cat_accounting", "name": "Accounting", "icon": "📚", "color": "#EF4444", "customIcon": null },
+    { "id": "cat_marketing", "name": "Marketing", "icon": "📣", "color": "#F97316", "customIcon": null }
+  ],
+  "purchases": [],
+  "settings": { "appTitle": "Lead Store", "appSubtitle": "Buy leads", "wallets": { "btc": "", "eth": "", "usdt_trc20": "" }, "accent": "#F0B90B" }
+}

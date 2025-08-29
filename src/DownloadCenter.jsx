@@ -1,78 +1,45 @@
-import React, { useState, useEffect } from 'react';
+// src/DownloadCenter.jsx
+import React, { useEffect, useMemo, useState } from 'react';
+import './DownloadCenter.css';
 
-const DownloadCenter = ({ onBack }) => {
-  const [purchases, setPurchases] = useState([]);
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
 
-  useEffect(() => {
-    fetchPurchases();
+const DownloadCenter = () => {
+  const [approved, setApproved] = useState([]);
+
+  const userId = useMemo(() => {
+    let id = localStorage.getItem('userId');
+    if (!id) {
+      id = 'user_' + Math.random().toString(36).slice(2, 11);
+      localStorage.setItem('userId', id);
+    }
+    return id;
   }, []);
 
-  const fetchPurchases = async () => {
-    // Get user ID from localStorage
-    const userId = localStorage.getItem('userId');
-    if (!userId) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:3001/api/purchases/${userId}`);
-      const data = await response.json();
-      setPurchases(data);
-    } catch (error) {
-      console.error('Error fetching purchases:', error);
-    }
-  };
-
-  const handleDownload = (file) => {
-    // Simulate file download
-    alert(`Downloading ${file.name}`);
-    // In a real app, you would generate a download link
-    // window.open(file.url, '_blank');
-  };
+  useEffect(() => {
+    (async () => {
+      const list = await fetch(`${API_BASE}/api/purchases?userId=${userId}&status=completed`).then(r => r.json());
+      setApproved(list.reverse());
+    })();
+  }, [userId]);
 
   return (
     <div className="download-center">
-      <div className="view-header">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <h2>📥 My Downloads</h2>
-      </div>
-
-      <div className="downloads-list">
-        {purchases.length === 0 ? (
-          <div className="empty-downloads">
-            <p>No downloads available yet.</p>
-            <p>Your purchased files will appear here after payment approval.</p>
+      <h2>Your Downloads</h2>
+      {approved.length === 0 && <p className="no-downloads">No approved purchases yet.</p>}
+      {approved.map((p) => (
+        <div key={p.id} className="download-card">
+          <h3>{p.productName}</h3>
+          <p>Status: <span className="status approved">Approved</span></p>
+          <div className="download-files">
+            {p.files?.map((file, i) => (
+              <a key={i} href={`${API_BASE}${file.url}`} download={file.name} className="download-btn">
+                Download {file.name}
+              </a>
+            ))}
           </div>
-        ) : (
-          purchases.map(purchase => (
-            <div key={purchase.id} className="download-item">
-              <h3>{purchase.product.name}</h3>
-              <p>Purchased on: {new Date(purchase.date).toLocaleDateString()}</p>
-              <p>Status: <span className={`status ${purchase.status}`}>{purchase.status}</span></p>
-              
-              <div className="download-files">
-                <h4>Files:</h4>
-                {purchase.files.map((file, index) => (
-                  <div key={index} className="file-item">
-                    <span className="file-icon">
-                      {file.type === 'pdf' ? '📄' : 
-                       file.type === 'csv' ? '📊' : 
-                       file.type === 'zip' ? '📦' : '📁'}
-                    </span>
-                    <span className="file-name">{file.name}</span>
-                    <button 
-                      className="download-btn"
-                      onClick={() => handleDownload(file)}
-                    >
-                      Download
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+        </div>
+      ))}
     </div>
   );
 };

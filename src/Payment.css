@@ -1,0 +1,116 @@
+/* src/Payment.css */
+:root {
+  --accent: var(--tg-theme-button-color, #F0B90B);
+  --bg: var(--tg-theme-bg-color, #0b1220);
+  --panel: var(--tg-theme-secondary-bg-color, #151a28);
+  --text: var(--tg-theme-text-color, #e7eaf3);
+  --hint: var(--tg-theme-hint-color, #8e8e93);
+  --danger: #ef4444;
+  --success: #10b981;
+}
+
+.payment-modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: center;
+}
+
+.payment-container {
+  width: 100%; max-width: 720px;
+  background: var(--panel);
+  border: 1px solid #233;
+  border-radius: 16px;
+  padding: 20px;
+  color: var(--text);
+}
+
+.payment-header {
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid #233; padding-bottom: 10px; margin-bottom: 16px;
+}
+.back-btn { background: transparent; border: none; color: var(--text); cursor: pointer; }
+
+.product-section {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg); border: 1px solid #233; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+}
+.product-title { display: flex; gap: 12px; align-items: center; }
+.product-title .emoji { font-size: 28px; }
+.product-section h3 { margin: 0; }
+.subtitle { margin: 2px 0 0 0; color: var(--hint); font-size: 0.9rem; }
+.product-price { font-weight: 700; color: var(--accent); font-size: 1.2rem; }
+
+.method-tabs { display: flex; gap: 8px; margin: 12px 0; }
+.method-tabs button {
+  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid #233; background: #0f1729; color: var(--text); cursor: pointer;
+}
+.method-tabs button.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+.method-details { background: #0f1729; border: 1px solid #233; border-radius: 12px; padding: 14px; }
+
+.confirm-btn {
+  width: 100%; margin-top: 12px; padding: 12px 16px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: #111; font-weight: 700;
+}
+
+.crypto-info label { display: block; margin-bottom: 6px; }
+.crypto-info select {
+  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #233; background: var(--panel); color: var(--text);
+}
+.wallet-block { margin-top: 12px; }
+.wallet-label { color: var(--hint); margin-bottom: 4px; }
+.wallet-row { display: flex; align-items: center; gap: 8px; }
+.wallet { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0b1220; border: 1px solid #233; padding: 8px; border-radius: 6px; display: inline-block; }
+.copy-btn { padding: 6px 8px; background: #1e293b; border: 1px solid #233; color: var(--text); border-radius: 6px; cursor: pointer; }
+.qr-wrap { margin-top: 12px; display: flex; justify-content: center; }
+
+.tx-section { margin-top: 12px; }
+.tx-section input {
+  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #233; background: var(--panel); color: var(--text);
+  margin-top: 6px; margin-bottom: 8px;
+}
+.outline-btn {
+  width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer;
+}
+
+.payment-receipt {
+  background: var(--bg); border: 1px solid #233; border-radius: 12px; padding: 16px; margin-top: 16px;
+}
+.status { padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.85rem; }
+.status.pending { background: #f59e0b; color: #111; }
+.status.completed, .status.approved { background: var(--success); color: #fff; }
+.status.rejected { background: var(--danger); color: #fff; }
+.pending-msg { color: #f59e0b; margin-top: 8px; }
+.rejected-msg { color: var(--danger); margin-top: 8px; }
+.mono { font-family: ui-monospace, Menlo, monospace; }
+
+.download-files { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; }
+.download-btn {
+  background: var(--accent); color: #111; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 700;
+}
+
+.cancel-btn {
+  width: 100%; margin-top: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid #233; background: transparent; color: var(--text); cursor: pointer;
+}
+
+.receipt-actions {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.back-to-store-btn {
+  background: var(--tg-theme-button-color, #2481cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-to-store-btn:hover {
+  background: #1a6bb3;
+  transform: translateY(-2px);
+}

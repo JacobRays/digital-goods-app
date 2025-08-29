@@ -1,201 +1,293 @@
-// SIMPLIFIED Payment.jsx - Remove Stars confusion
-const Payment = ({ product, onClose, onSuccess }) => {
-  const [selectedMethod, setSelectedMethod] = useState('paypal'); // Default to PayPal
+// src/Payment.jsx
+import React, { useEffect, useMemo, useState } from 'react';
+import './Payment.css';
+import { io } from 'socket.io-client';
+import { QRCodeSVG } from 'qrcode.react';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+const PAYPAL_ME = 'premiumrays'; // your username
+
+const Payment = ({ product, onClose }) => {
+  const [selectedMethod, setSelectedMethod] = useState('paypal');
   const [selectedCrypto, setSelectedCrypto] = useState('btc');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [purchase, setPurchase] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [txHash, setTxHash] = useState('');
 
-  const PAYPAL_ME_LINK = 'https://paypal.me/premiumrays';
+  // stable user id
+  const userId = useMemo(() => {
+    let id = localStorage.getItem('userId');
+    if (!id) {
+      id = 'user_' + Math.random().toString(36).slice(2, 11);
+      localStorage.setItem('userId', id);
+    }
+    return id;
+  }, []);
 
-  const cryptoAddresses = {
-    btc: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-    eth: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', 
-    usdt: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7'
-  };
+  // socket.io
+  useEffect(() => {
+    const socket = io(API_BASE, { transports: ['websocket'] });
+    socket.emit('join', { userId });
+    socket.on('purchase-updated', (payload) => {
+      if (purchase && payload.id === purchase.id) setPurchase(payload);
+    });
+    return () => socket.disconnect();
+  }, [userId, purchase]);
 
-  // Remove ALL Stars-related code
-  const handlePayment = async () => {
-    if (selectedMethod === 'paypal') {
-      const paypalUrl = `${PAYPAL_ME_LINK}/${product.price}USD?locale.x=en_US`;
-      window.open(paypalUrl, '_blank');
-      
-      setIsProcessing(true);
-      setTimeout(() => {
-        setIsProcessing(false);
-        onSuccess(true); // Instant access
-      }, 1000);
+  // load settings (wallets) + refresh latest purchase every 5s
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await fetch(`${API_BASE}/api/settings`).then((r) => r.json());
+        setSettings(s);
+      } catch (e) { console.error(e); }
+    })();
+    const tick = async () => {
+      try {
+        const list = await fetch(`${API_BASE}/api/purchases?userId=${userId}`).then((r) => r.json());
+        if (Array.isArray(list) && list.length > 0) setPurchase(list[list.length - 1]);
+      } catch (e) { /* ignore */ }
+    };
+    tick();
+    const iv = setInterval(tick, 5000);
+    return () => clearInterval(iv);
+  }, [userId]);
+
+  const wallets = useMemo(() => ({
+    btc: settings?.wallets?.btc || '',
+    eth: settings?.wallets?.eth || '',
+    usdt: settings?.wallets?.usdt_trc20 || ''
+  }), [settings]);
+
+  const cryptoAddress = wallets[selectedCrypto];
+
+  const handlePayPal = async () => {
+    setIsProcessing(true);
+    window.open(`https://paypal.me/${PAYPAL_ME}/${product?.price}`, '_blank');
+
+    // Create completed purchase (instant access for PayPal.me flow)
+    try {
+      const resp = await fetch(`${API_BASE}/api/purchases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          productName: product.name,
+          amount: product.price,
+          currency: 'USD',
+          status: 'completed',
+          files: product.files || [],
+          paymentMethod: 'paypal'
+        })
+      });
+      const p = await resp.json();
+      setPurchase(p);
+    } catch (e) {
+      console.error(e);
+      alert('Could not record PayPal purchase.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // Keep your perfect crypto system
-  const handleCryptoPaymentComplete = async () => {
-    if (window.confirm(`Please send $${product.price} in ${selectedCrypto.toUpperCase()} and confirm.`)) {
-      setIsProcessing(true);
-      let userId = localStorage.getItem('userId');
-      if (!userId) {
-        userId = 'user_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('userId', userId);
-      }
-      try {
-        const response = await fetch('http://localhost:3001/api/crypto-payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            product,
-            amount: product.price,
-            cryptoCurrency: selectedCrypto,
-            cryptoAddress: cryptoAddresses[selectedCrypto],
-          }),
-        });
-        if (response.ok) {
-          alert('Payment recorded! You\'ll get files after verification.');
-          onSuccess(false);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsProcessing(false);
-      }
+  const handleCrypto = async () => {
+    if (!cryptoAddress) {
+      alert('Crypto wallet is not configured by admin.');
+      return;
+    }
+    if (!window.confirm(`Send $${product.price} in ${selectedCrypto.toUpperCase()} to:\n${cryptoAddress}`)) {
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/purchases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          productName: product.name,
+          amount: product.price,
+          currency: selectedCrypto.toUpperCase(),
+          status: 'pending',
+          files: product.files || [],
+          paymentMethod: 'crypto',
+          cryptoCurrency: selectedCrypto.toUpperCase(),
+          cryptoAddress
+        })
+      });
+      const p = await resp.json();
+      setPurchase(p);
+      alert('Payment recorded. Your files will be released once verified.');
+    } catch (e) {
+      console.error(e);
+      alert('Could not record crypto payment.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const submitTxHash = async () => {
+    if (!purchase) return;
+    try {
+      const resp = await fetch(`${API_BASE}/api/purchases/${purchase.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash: txHash.trim() })
+      });
+      const updated = await resp.json();
+      setPurchase(updated);
+      alert('Transaction hash submitted. Admin will verify soon.');
+    } catch (e) {
+      console.error(e);
+      alert('Could not submit tx hash.');
     }
   };
 
   return (
     <div className="payment-modal">
-      <div className="payment-content">
+      <div className="payment-container">
+
+        {/* Header */}
         <div className="payment-header">
           <button className="back-btn" onClick={onClose}>← Back</button>
-          <h2>Complete Purchase</h2>
-        </div>
-        
-        <div className="product-info">
-          <h3>{product.name}</h3>
-          <p className="price">${product.price}</p>
+          <h2>{settings?.appTitle || 'Complete Purchase'}</h2>
         </div>
 
-        <div className="payment-methods">
-          <h4>Select Payment Method</h4>
-
-          {/* PayPal Option */}
-          <div className="method-option">
-            <input
-              type="radio"
-              id="paypal"
-              name="paymentMethod"
-              value="paypal"
-              checked={selectedMethod === 'paypal'}
-              onChange={() => setSelectedMethod('paypal')}
-            />
-            <label htmlFor="paypal">
-              <span className="method-icon">📱</span>
-              PayPal.me (Instant Delivery)
-            </label>
-          </div>
-
-          {/* Crypto Option */}
-          <div className="method-option">
-            <input
-              type="radio"
-              id="crypto"
-              name="paymentMethod"
-              value="crypto"
-              checked={selectedMethod === 'crypto'}
-              onChange={() => setSelectedMethod('crypto')}
-            />
-            <label htmlFor="crypto">
-              <span className="method-icon">₿</span>
-              Cryptocurrency (24hr Verification)
-            </label>
-          </div>
-
-          {/* Crypto Details */}
-          {selectedMethod === 'crypto' && (
-            <div className="crypto-selection">
-              <h5>Select Cryptocurrency:</h5>
-              <div className="crypto-options">
-                <div className="crypto-option">
-                  <input
-                    type="radio"
-                    id="btc"
-                    name="cryptoType"
-                    value="btc"
-                    checked={selectedCrypto === 'btc'}
-                    onChange={() => setSelectedCrypto('btc')}
-                  />
-                  <label htmlFor="btc">Bitcoin (BTC)</label>
-                </div>
-                <div className="crypto-option">
-                  <input
-                    type="radio"
-                    id="eth"
-                    name="cryptoType"
-                    value="eth"
-                    checked={selectedCrypto === 'eth'}
-                    onChange={() => setSelectedCrypto('eth')}
-                  />
-                  <label htmlFor="eth">Ethereum (ETH)</label>
-                </div>
-                <div className="crypto-option">
-                  <input
-                    type="radio"
-                    id="usdt"
-                    name="cryptoType"
-                    value="usdt"
-                    checked={selectedCrypto === 'usdt'}
-                    onChange={() => setSelectedCrypto('usdt')}
-                  />
-                  <label htmlFor="usdt">USDT (TRC20)</label>
-                </div>
-              </div>
-
-              <div className="crypto-info">
-                <p>Send exactly <strong>${product.price} USD</strong> equivalent in {selectedCrypto.toUpperCase()}:</p>
-                <div className="crypto-address-box">
-                  <p className="crypto-address-label">{selectedCrypto.toUpperCase()} Address:</p>
-                  <div className="address-container">
-                    <code className="crypto-address">{cryptoAddresses[selectedCrypto]}</code>
-                    <button 
-                      className="copy-btn"
-                      onClick={() => {
-                        navigator.clipboard.writeText(cryptoAddresses[selectedCrypto]);
-                        alert('Address copied to clipboard!');
-                      }}
-                    >
-                      📋 Copy
-                    </button>
-                  </div>
-                </div>
-                <p className="note">* Send exact amount, transaction fees are your responsibility</p>
-                <p className="note">* Confirmations may take 10-30 minutes</p>
-                <p className="note">* Files available after verification (within 24 hours)</p>
-                
-                <button 
-                  className="crypto-confirm-btn"
-                  onClick={handleCryptoPaymentComplete}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? 'Processing...' : `I've Sent the ${selectedCrypto.toUpperCase()}`}
-                </button>
-              </div>
+        {/* Product Info */}
+        <div className="product-section">
+          <div className="product-title">
+            <div className="emoji">{product.thumbnail || '📦'}</div>
+            <div>
+              <h3>{product.name}</h3>
+              <p className="subtitle">{settings?.appSubtitle || 'Instant digital goods'}</p>
             </div>
-          )}
+          </div>
+          <p className="product-price">${product.price}</p>
+        </div>
 
+        {/* Method Tabs */}
+        <div className="method-tabs">
+          <button
+            className={selectedMethod === 'paypal' ? 'active' : ''}
+            onClick={() => setSelectedMethod('paypal')}
+          >
+            PayPal
+          </button>
+          <button
+            className={selectedMethod === 'crypto' ? 'active' : ''}
+            onClick={() => setSelectedMethod('crypto')}
+          >
+            Crypto
+          </button>
+        </div>
+
+        {/* Method Details */}
+        <div className="method-details">
           {selectedMethod === 'paypal' && (
             <div className="paypal-info">
-              <p>You will be redirected to PayPal to complete your payment</p>
-              <p className="note">* Instant access to files after payment</p>
+              <p>You’ll be redirected to PayPal.me to complete your payment.</p>
+              <button className="confirm-btn" onClick={handlePayPal} disabled={isProcessing}>
+                {isProcessing ? 'Redirecting...' : 'Pay with PayPal'}
+              </button>
+            </div>
+          )}
+
+          {selectedMethod === 'crypto' && (
+            <div className="crypto-info">
+              <label>Select Crypto:</label>
+              <select value={selectedCrypto} onChange={(e) => setSelectedCrypto(e.target.value)}>
+                <option value="btc">BTC</option>
+                <option value="eth">ETH</option>
+                <option value="usdt">USDT (TRC20)</option>
+              </select>
+
+              <div className="wallet-block">
+                <p className="wallet-label">Wallet Address:</p>
+                <div className="wallet-row">
+                  <span className="wallet">{cryptoAddress || 'Not set'}</span>
+                  {cryptoAddress && (
+                    <button
+                      className="copy-btn"
+                      onClick={() => navigator.clipboard.writeText(cryptoAddress)}
+                    >
+                      Copy
+                    </button>
+                  )}
+                </div>
+                {cryptoAddress && (
+                  <div className="qr-wrap">
+                    <QRCodeSVG value={cryptoAddress} size={140} />
+                  </div>
+                )}
+              </div>
+
+              <button className="confirm-btn" onClick={handleCrypto} disabled={isProcessing}>
+                {isProcessing ? 'Recording...' : `I have sent ${selectedCrypto.toUpperCase()}`}
+              </button>
+
+              {purchase?.paymentMethod === 'crypto' && (
+                <div className="tx-section">
+                  <label>Transaction Hash (optional but recommended):</label>
+                  <input
+                    type="text"
+                    placeholder="Paste your tx hash…"
+                    value={txHash}
+                    onChange={(e) => setTxHash(e.target.value)}
+                  />
+                  <button className="outline-btn" onClick={submitTxHash}>Submit Hash</button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {selectedMethod === 'paypal' && (
-          <button 
-            className="pay-now-btn"
-            onClick={handlePayment}
-            disabled={isProcessing}
-          >
-            {isProcessing ? 'Redirecting...' : `Pay with PayPal.me`}
-          </button>
+        {/* Receipt */}
+        {purchase && (
+          <div className="payment-receipt">
+            <h3>Payment Receipt</h3>
+            <p><strong>Product:</strong> {purchase.productName}</p>
+            <p><strong>Amount:</strong> {purchase.amount} {purchase.currency}</p>
+            <p>
+              <strong>Status:</strong>{' '}
+              <span className={`status ${purchase.status}`}>{purchase.status}</span>
+            </p>
+
+            {purchase.txHash && (
+              <p><strong>Tx:</strong> <span className="mono">{purchase.txHash}</span></p>
+            )}
+
+            {purchase.status === 'pending' && (
+              <p className="pending-msg">⏳ Your payment is pending. Please wait for admin approval.</p>
+            )}
+
+            {purchase.status === 'completed' && (
+              <div className="download-files">
+                <h4>Download Files</h4>
+                {purchase.files?.map((file, idx) => (
+                  <a key={idx} href={`${API_BASE}${file.url}`} download={file.name} className="download-btn">
+                    Download {file.name}
+                    <div className="receipt-actions">
+                   <button
+                     className="back-to-store-btn"
+                     onClick={() => window.location.href = '/'}
+                     >
+                     ← Back to Store
+                    </button>
+                    </div>
+
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {purchase.status === 'rejected' && (
+              <p className="rejected-msg">❌ Your payment was rejected. Please contact support.</p>
+            )}
+          </div>
         )}
+
+        <button className="cancel-btn" onClick={onClose}>Close</button>
       </div>
     </div>
   );

@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+// src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import './App-new.css';
 import AdminPanel from './AdminPanel';
 import Payment from './Payment';
 import DownloadCenter from './DownloadCenter';
+import BatchSelection from './BatchSelection';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://digital-goods-app-tqac.onrender.com';
 
@@ -11,104 +14,85 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [user, setUser] = useState(null);
+  const [telegramReady, setTelegramReady] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [activeNav, setActiveNav] = useState('home');
   const [isAdmin, setIsAdmin] = useState(true);
+
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
   const [purchases, setPurchases] = useState([]);
+  const [showBatchSelection, setShowBatchSelection] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [cartItems, setCartItems] = useState([]);
-  const [telegramReady, setTelegramReady] = useState(false);
+  const [availableBatches, setAvailableBatches] = useState([]);
 
-  // --- Fallback demo data ---
-  const fallbackCategories = [
-    { id: 1, name: 'Business leads', icon: '📊', color: '#3B82F6' },
-    { id: 2, name: 'Crypto', icon: '💰', color: '#F59E0B' },
-    { id: 3, name: 'Courses', icon: '📚', color: '#EF4444' },
-    { id: 4, name: 'Software', icon: '⚙️', color: '#10B981' },
-    { id: 5, name: 'Design', icon: '🎨', color: '#8B5CF6' },
-    { id: 6, name: 'Lifestyle', icon: '🌿', color: '#EC4899' }
-  ];
-
-  const fallbackProducts = [
-    {
-      id: 'law-leads-1',
-      name: 'Law Firm Leads - Batch 1',
-      price: 40,
-      description: '100 premium law firm leads with full contact details',
-      thumbnail: '⚖️',
-      category: 'Business leads',
-      rating: 4.8
-    },
-    {
-      id: 'real-estate-1',
-      name: 'Real Estate Leads - Batch 1',
-      price: 35,
-      description: '100 real estate agent leads with contact info',
-      thumbnail: '🏠',
-      category: 'Business leads',
-      rating: 4.6
-    },
-    {
-      id: 'marketing-course',
-      name: 'Marketing Course',
-      price: 100,
-      description: 'Complete digital marketing guide',
-      thumbnail: '🎓',
-      category: 'Courses',
-      rating: 4.9
-    }
-  ];
-
-  // --- Fetch backend data with fallback ---
+  // Fetch live categories & products on mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [catRes, prodRes] = await Promise.all([
-          fetch(`${API_BASE}/api/categories`).then(r => r.json()).catch(() => []),
-          fetch(`${API_BASE}/api/products`).then(r => r.json()).catch(() => [])
-        ]);
+    fetch(`${API_BASE}/api/categories`)
+      .then((res) => res.json())
+      .then((data) => setAvailableBatches(data)) // reusing availableBatches
+      .catch((e) => console.error('Error fetching categories', e));
 
-        setCategories(catRes.length > 0 ? catRes : fallbackCategories);
-        setProducts(prodRes.length > 0 ? prodRes : fallbackProducts);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setCategories(fallbackCategories);
-        setProducts(fallbackProducts);
-      }
-    };
-    fetchData();
+    fetch(`${API_BASE}/api/products`)
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((e) => console.error('Error fetching products', e));
   }, []);
 
+  // Telegram / User setup
+  useEffect(() => {
+    setIsAdmin(true);
+    setTimeout(() => {
+      setTelegramReady(true);
+      setUser({ first_name: "User" });
+    }, 500);
+  }, []);
+
+  const safeNavigate = (view, delay = 100) => {
+    setTimeout(() => {
+      setActiveView(view);
+      setActiveNav(view === 'home' ? 'home' : activeNav);
+      setShowPayment(false);
+      setShowBatchSelection(false);
+      setSelectedBatch(null);
+    }, delay);
+  };
+
+  const handleBuy = (batch) => {
+    setSelectedBatch(batch);
+    setShowPayment(true);
+  };
+
+  const handleAddToCart = (batch) => {
+    setCartItems([...cartItems, batch]);
+    setCartCount((c) => c + 1);
+    alert(`${batch.name} added to cart!`);
+  };
+
+  const calculateCartTotal = () =>
+    cartItems.reduce((total, item) => total + (item.price || 0), 0);
+
+  const removeFromCart = (index) => {
+    const copy = [...cartItems];
+    copy.splice(index, 1);
+    setCartItems(copy);
+    setCartCount(copy.length);
+  };
+
   const featuredProducts = products.slice(0, 3);
+
+  const getProductsByCategory = (categoryName) =>
+    products.filter((p) => p.category === categoryName);
 
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
     setActiveView('category-products');
-    const filtered = products.filter(p => p.category === category.name);
-    setCategoryProducts(filtered);
+    setCategoryProducts(getProductsByCategory(category.name));
   };
 
-  const handleBuy = (product) => {
-    setSelectedBatch(product);
-    setShowPayment(true);
-  };
-
-  const handleAddToCart = (product) => {
-    setCartItems([...cartItems, product]);
-    setCartCount(prev => prev + 1);
-  };
-
-  const safeNavigate = (view) => {
-    setActiveView(view);
-    setShowPayment(false);
-    setSelectedBatch(null);
-  };
-
-  // --- UI renderers ---
   const renderTopNavigation = () => (
     <div className="header-with-nav">
       <div className="app-header">
@@ -116,9 +100,33 @@ function App() {
         <p className="app-subtitle">Instant digital goods</p>
       </div>
       <nav className="top-navigation">
-        <button className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`} onClick={() => { setActiveNav('home'); safeNavigate('home'); }}>🏠 Home</button>
-        <button className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`} onClick={() => { setActiveNav('cart'); safeNavigate('cart'); }}>🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}</button>
-        <button className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`} onClick={() => { setActiveNav('downloads'); safeNavigate('downloads'); }}>📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}</button>
+        <button
+          className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('home');
+            safeNavigate('home');
+          }}
+        >
+          🏠 Home
+        </button>
+        <button
+          className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('cart');
+            safeNavigate('cart');
+          }}
+        >
+          🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+        </button>
+        <button
+          className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('downloads');
+            safeNavigate('downloads');
+          }}
+        >
+          📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}
+        </button>
       </nav>
     </div>
   );
@@ -126,33 +134,68 @@ function App() {
   const renderHome = () => (
     <div className="view">
       {renderTopNavigation()}
+
+      <div className="search-container">
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+      </div>
+
       <section className="section">
         <h2 className="section-title">Categories</h2>
         <div className="categories-grid">
-          {categories.map(c => (
-            <div key={c.id} className="category-item" onClick={() => handleCategorySelect(c)}>
-              <div className="category-icon" style={{ backgroundColor: c.color }}>{c.icon}</div>
-              <span className="category-name">{c.name}</span>
+          {availableBatches.map((category) => (
+            <div
+              key={category.id}
+              className="category-item"
+              onClick={() => handleCategorySelect(category)}
+            >
+              <div className="category-icon" style={{ backgroundColor: category.color }}>
+                {category.icon}
+              </div>
+              <span className="category-name">{category.name}</span>
             </div>
           ))}
         </div>
       </section>
+
       <section className="section">
-        <h2 className="section-title">Featured</h2>
+        <div className="section-header">
+          <h2 className="section-title">Featured</h2>
+          <span className="see-all">See all</span>
+        </div>
         <div className="products-grid">
-          {featuredProducts.map(p => (
-            <div key={p.id} className="product-card">
-              <div className="product-image">{p.thumbnail}</div>
+          {featuredProducts.map((product) => (
+            <div key={product.id} className="product-card">
+              <div className="product-image">{product.thumbnail}</div>
               <div className="product-content">
-                <h3>{p.name}</h3>
-                <p>{p.description}</p>
+                <h3 className="product-name">{product.name}</h3>
+                <p className="product-desc">{product.description}</p>
                 <div className="product-footer">
-                  <span className="price">${p.price}</span>
-                  <button onClick={() => handleBuy(p)}>Buy Now</button>
+                  <div className="price-section">
+                    <span className="price">${product.price}</span>
+                    <div className="rating">⭐ {product.rating}</div>
+                  </div>
+                  <button className="buy-button" onClick={() => handleBuy(product)}>
+                    Buy Now
+                  </button>
                 </div>
               </div>
             </div>
           ))}
+          {featuredProducts.length === 0 && (
+            <div className="no-products">
+              <p>No featured products yet.</p>
+              <p>Add some products in the admin panel!</p>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -160,39 +203,151 @@ function App() {
 
   const renderCategoryProducts = () => (
     <div className="view">
-      <button onClick={() => safeNavigate('home')}>← Back</button>
-      <h2>{selectedCategory?.icon} {selectedCategory?.name}</h2>
+      <div className="view-header">
+        <button className="back-btn" onClick={() => safeNavigate('home')}>
+          ← Back to Categories
+        </button>
+        <h2>{selectedCategory?.icon} {selectedCategory?.name}</h2>
+        <p className="category-description">Select from our available lead batches</p>
+      </div>
       <div className="products-grid">
-        {categoryProducts.map(p => (
-          <div key={p.id} className="product-card">
-            <div className="product-image">{p.thumbnail}</div>
+        {categoryProducts.map((product) => (
+          <div key={product.id} className="product-card">
+            <div className="product-image">{product.thumbnail}</div>
             <div className="product-details">
-              <h3>{p.name}</h3>
-              <p>{p.description}</p>
-              <span className="price">${p.price}</span>
-              <button onClick={() => handleBuy(p)}>Buy Now</button>
-              <button onClick={() => handleAddToCart(p)}>Add to Cart</button>
+              <h3>{product.name}</h3>
+              <p className="product-desc">{product.description}</p>
+              <div className="product-meta">
+                <span className="price">${product.price}</span>
+                <div className="rating">⭐ {product.rating}</div>
+              </div>
+              <div className="product-actions">
+                <button className="buy-now-btn" onClick={() => handleBuy(product)}>
+                  Buy Now
+                </button>
+                <button className="add-to-cart-btn" onClick={() => handleAddToCart(product)}>
+                  Add to Cart
+                </button>
+              </div>
             </div>
           </div>
         ))}
+        {categoryProducts.length === 0 && (
+          <div className="no-products">
+            <p>No products found in this category.</p>
+            <p>Add some products in the admin panel!</p>
+          </div>
+        )}
       </div>
     </div>
   );
 
-return (
-  <div className="app">
-    {activeView === 'home' && renderHome()}
-    {activeView === 'category-products' && renderCategoryProducts()}
-    {activeView === 'admin' && <AdminPanel onBack={() => safeNavigate('home')} />}
-    {activeView === 'downloads' && (
-      <DownloadCenter purchases={purchases} onBack={() => safeNavigate('home')} />
-    )}
-    {showPayment && (
-      <Payment
-        product={selectedBatch || selectedProduct}
-        onClose={() => safeNavigate('home')}
-      />
-    )}
-  </div>
-);
+  const renderCart = () => (
+    <div className="view">
+      <div className="view-header">
+        <button className="back-btn" onClick={() => safeNavigate('home')}>
+          ← Back
+        </button>
+        <h2>🛒 Your Cart</h2>
+      </div>
+      <div className="cart-items">
+        {cartItems.length === 0 ? (
+          <div className="empty-cart">
+            <p>Your cart is empty</p>
+            <button className="continue-shopping-btn" onClick={() => setActiveView('home')}>
+              Continue Shopping
+            </button>
+          </div>
+        ) : (
+          <>
+            {cartItems.map((item, idx) => (
+              <div key={idx} className="cart-item">
+                <span className="cart-product-thumb">{item.thumbnail}</span>
+                <div className="cart-product-info">
+                  <h4>{item.name}</h4>
+                  <p>{item.description}</p>
+                </div>
+                <div className="cart-product-price">
+                  <span>${item.price}</span>
+                  <button className="remove-item-btn" onClick={() => removeFromCart(idx)}>
+                    ❌
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div className="cart-total">
+              <h3>Total: ${calculateCartTotal()}</h3>
+              <button
+                className="checkout-btn"
+                onClick={() => {
+                  setSelectedProduct({ name: 'Cart Items', price: calculateCartTotal(), description: 'Multiple products in cart' });
+                  setShowPayment(true);
+                }}
+              >
+                Checkout Now
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDownloads = () => (
+    <DownloadCenter purchases={purchases} onBack={() => safeNavigate('home')} />
+  );
+
+  const renderAdmin = () => (
+    <AdminPanel onBack={() => safeNavigate('home')} />
+  );
+
+  return (
+    <div className="app">
+      <div className="app-container">
+        {activeView === 'home' && renderHome()}
+        {activeView === 'category-products' && renderCategoryProducts()}
+        {activeView === 'cart' && renderCart()}
+        {activeView === 'downloads' && renderDownloads()}
+        {activeView === 'admin' && renderAdmin()}
+
+        {showPayment && (
+          <Payment
+            product={selectedBatch || selectedProduct}
+            onClose={() => safeNavigate('home')}
+            onSuccess={(immediateAccess) => {
+              if (selectedProduct && selectedProduct.name === 'Cart Items') {
+                setCartItems([]);
+                setCartCount(0);
+              }
+              const purchase = {
+                id: Date.now(),
+                product: selectedBatch || selectedProduct,
+                date: new Date().toLocaleString(),
+                status: immediateAccess ? 'completed' : 'pending',
+                files: immediateAccess ? (selectedBatch || selectedProduct).files : []
+              };
+              setPurchases((p) => [...p, purchase]);
+              safeNavigate(immediateAccess ? 'downloads' : 'home');
+            }}
+          />
+        )}
+
+        {(activeView === '' || activeView === undefined) && (
+          <div className="emergency-nav">
+            <h3>Navigation</h3>
+            <button onClick={() => safeNavigate('home', 0)}>Go Home</button>
+            <button onClick={() => safeNavigate('downloads', 0)}>My Downloads</button>
+          </div>
+        )}
+
+        {isAdmin && activeView !== 'admin' && (
+          <div className="floating-admin-btn" onClick={() => safeNavigate('admin')}>
+            ⚙️
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
+
+export default App;

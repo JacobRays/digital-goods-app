@@ -79,14 +79,14 @@
 }
 
 .thumbnail-option:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
   border-color: var(--tg-theme-button-color, #2481cc);
 }
 
 .thumbnail-option.selected {
   border-color: var(--tg-theme-button-color, #2481cc);
-  background: rgba(36, 129, 204, 0.2);
-  transform: scale(1.1);
+  background: rgba(36, 129, 204, 0.12);
+  transform: scale(1.05);
 }
 
 /* Buttons */
@@ -124,6 +124,92 @@
   background: #777;
 }
 
+/* Upload Button (for batch files) */
+.upload-btn {
+  background: var(--tg-theme-button-color, #2481cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  border: none;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.upload-btn:hover {
+  background: #1a6bb3;
+  transform: translateY(-2px);
+}
+
+/* Upload to server button */
+.upload-to-server-btn {
+  background: var(--tg-theme-button-color, #2481cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* File Upload Area */
+.file-upload-area {
+  margin-top: 10px;
+}
+
+.file-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--tg-theme-secondary-bg-color, #1e2a38);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--tg-theme-text-color, #ffffff);
+  border: 1px solid var(--tg-theme-secondary-bg-color, #344356);
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-item .delete-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.file-item .delete-btn:hover {
+  background: #f87171;
+}
+
+.download-link {
+  background: rgba(255,255,255,0.06);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--tg-theme-text-color, #fff);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
 /* Products List */
 .products-list {
   margin-top: 30px;
@@ -149,6 +235,7 @@
 .products-grid {
   display: grid;
   gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .admin-product-card {
@@ -234,78 +321,161 @@
   .thumbnail-grid {
     grid-template-columns: repeat(4, 1fr);
   }
-  
+
   .product-form {
     padding: 20px;
   }
-  
+
   .product-actions {
     flex-direction: column;
   }
-  
+
   .edit-btn, .delete-btn {
     width: 100%;
   }
 }
 
+/* Payments */
 .payment-item {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
+  background: var(--tg-theme-secondary-bg-color, #344356);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--tg-theme-secondary-bg-color, #344356);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .payment-info h4 {
+  color: var(--tg-theme-text-color, #ffffff);
   margin: 0 0 10px 0;
-  color: #333;
+}
+
+.payment-info p {
+  color: var(--tg-theme-hint-color, #8e8e93);
+  margin: 5px 0;
+  font-size: 0.9rem;
 }
 
 .status {
   padding: 4px 8px;
   border-radius: 4px;
   font-weight: bold;
-  margin-left: 8px;
+  font-size: 0.8rem;
+  margin-top: 8px;
+  display: inline-block;
 }
 
 .status.pending {
-  background-color: #ffd700;
+  background-color: #f59e0b;
   color: #000;
 }
 
 .status.approved {
-  background-color: #4caf50;
+  background-color: #10b981;
   color: white;
 }
 
 .status.rejected {
-  background-color: #f44336;
+  background-color: #ef4444;
   color: white;
+}
+
+.payment-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .approve-btn {
-  background-color: #4caf50;
+  background-color: #10b981;
   color: white;
   border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
-  margin-right: 8px;
 }
 
 .reject-btn {
-  background-color: #f44336;
+  background-color: #ef4444;
   color: white;
   border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
-.no-payments {
-  text-align: center;
-  padding: 40px;
-  color: #666;
+/* Settings Tabs */
+.settings-tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #344356);
+}
+
+.settings-tabs button {
+  background: none;
+  border: none;
+  padding: 10px 20px;
+  color: var(--tg-theme-hint-color, #8e8e93);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tabs button.active {
+  color: var(--tg-theme-button-color, #2481cc);
+  border-bottom-color: var(--tg-theme-button-color, #2481cc);
+}
+
+/* Sale Badge */
+.sale-badge {
+  background: #ef4444;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+/* Ensure vertical stacking for payments */
+.payments-list { display: flex; flex-direction: column; gap: 15px; }
+
+/* Binance-like accent */
+:root { --accent: var(--tg-theme-button-color, #F0B90B); }
+.submit-btn { background: var(--accent); color: #111; }
+.product-price { color: var(--accent); }
+.product-category { background: rgba(240,185,11,0.15); color: var(--accent); }
+.settings-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sale-badge { background: #ef4444; color: #fff; }
+
+/* Dropdown caret (custom) */
+.form-group select {
+  appearance: none;
+  background: var(--tg-theme-secondary-bg-color, #1e2a38)
+    url("data:image/svg+xml;charset=UTF-8,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='%23ffffff' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E")
+    no-repeat right 12px center/12px 12px;
+}
+
+.form-group select option[disabled] {
+  color: var(--tg-theme-hint-color, #8e8e93);
+  font-style: italic;
+}
+
+/* Disabled submit state */
+.submit-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Small spacing for staged-files header */
+.staged-files h4 {
+  margin: 0 0 8px 0;
+  color: var(--tg-theme-text-color, #fff);
+  font-size: 0.95rem;
+}
+
+.admin-product-card img {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
 }

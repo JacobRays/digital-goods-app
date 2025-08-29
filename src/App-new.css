@@ -913,3 +913,61 @@ body {
   background: var(--tg-theme-bg-color, #2a3b4d);
   transform: translateY(-2px);
 }
+
+/* ===== PROMOTIONAL BANNER CAROUSEL ===== */
+.banner-carousel {
+  display: flex;
+  overflow-x: auto;
+  gap: 14px;
+  padding: 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.banner-card {
+  position: relative;
+  flex: 0 0 85%;
+  scroll-snap-align: start;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--tg-theme-secondary-bg-color, #344356);
+  background: var(--tg-theme-bg-color, #2a3b4d);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.banner-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+
+.banner-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.banner-cta {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+
+.banner-card:hover .banner-cta {
+  background: var(--tg-theme-button-color, #2481cc);
+}
+
+/* Mobile tweaks */
+@media (max-width: 480px) {
+  .banner-card {
+    flex: 0 0 92%;
+  }
+}
