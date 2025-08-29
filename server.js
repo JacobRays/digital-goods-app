@@ -1,178 +1,194 @@
-import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import multer from 'multer';
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const app = express();
+const basePort = process.env.PORT || 3002;
 
-const app = express();  // Initialize app first
+// --- Middleware ---
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+app.use(express.json({ limit: '10mb' }));
+app.use('/uploads', express.static('uploads'));
 
-// THEN add middleware
-app.use(cors());
-app.use(express.json());
+// --- Ensure uploads folder exists ---
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
-// Debug middleware - ADD THIS AFTER app is initialized
-app.use((req, res, next) => {
-  console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
-
-// Initialize Telegram Bot - AFTER app initialization
-const botToken = process.env.TELEGRAM_BOT_TOKEN || '8293938224:AAGGowxpHe6LEdOfraN2isM7Y-vDGb7_--4';
-const bot = new TelegramBot(botToken, { polling: false });
-
-// Test endpoints - ADD THESE
+// --- Example test route ---
 app.get('/', (req, res) => {
-  res.json({ 
-    message: '🚀 Server is running!', 
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      '/health',
-      '/api/crypto-payments',
-      '/api/admin/payments'
-    ]
-  });
+  res.send('🚀 Server is running!');
 });
 
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: '✅ Healthy', 
-    serverTime: new Date().toISOString(),
-    port: process.env.PORT || 3002
-  });
+// --- File Upload Setup ---
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+});
+const upload = multer({ storage });
+
+app.post('/api/upload', upload.array('files'), (req, res) => {
+  const files = (req.files || []).map(f => ({
+    url: `/uploads/${f.filename}`,
+    name: f.originalname
+  }));
+  res.json({ files });
 });
 
-// Your existing data storage
-let payments = [];
-let purchases = [];
-
-// Load existing data if available
-try {
-  const data = fs.readFileSync(path.join(__dirname, 'data.json'), 'utf8');
-  const parsed = JSON.parse(data);
-  payments = parsed.payments || [];
-  purchases = parsed.purchases || [];
-} catch (error) {
-  console.log('Starting with empty data');
-}
-
-// Save data to file
-function saveData() {
-  const data = JSON.stringify({ payments, purchases }, null, 2);
-  fs.writeFileSync(path.join(__dirname, 'data.json'), data);
-}
-
-// SIMPLIFIED: Remove Stars endpoint since you don't have business account
-app.post('/api/create-stars-invoice', async (req, res) => {
-  res.json({
-    success: false,
-    fallback: true,
-    message: 'Telegram Stars requires business account. Please use PayPal or Crypto.',
-    availableMethods: ['paypal', 'crypto']
-  });
-});
-
-// Keep your working crypto payment system
-app.post('/api/crypto-payments', (req, res) => {
-  try {
-    const payment = {
-      id: Date.now().toString(),
-      ...req.body,
-      status: 'pending',
-      type: 'crypto',
-      createdAt: new Date().toISOString()
-    };
-    
-    payments.push(payment);
-    saveData();
-    
-    res.json({
-      success: true,
-      payment,
-      message: 'Crypto payment recorded. Awaiting manual approval.'
-    });
-    
-  } catch (error) {
-    console.error('Crypto payment error:', error);
-    res.status(500).json({ error: 'Failed to record payment' });
+// --- In-memory Data ---
+let products = [
+  {
+    id: 'p1',
+    name: 'Sample Product 1',
+    price: '$19.99',
+    image: '/uploads/sample1.jpg',
+    description: 'A great starter product'
+  },
+  {
+    id: 'p2',
+    name: 'Sample Product 2',
+    price: '$29.99',
+    image: '/uploads/sample2.jpg',
+    description: 'Another amazing product'
   }
-});
+];
 
-// ADD THIS GET ENDPOINT FOR TESTING
-app.get('/api/crypto-payments', (req, res) => {
-  res.json({
-    message: '✅ Crypto payments API is working!',
-    totalPayments: payments.length,
-    payments: payments,
-    status: 'success'
-  });
-});
-
-// Admin endpoints for crypto approval
-app.get('/api/admin/payments', (req, res) => {
-  const pendingPayments = payments.filter(p => p.status === 'pending' && p.type === 'crypto');
-  res.json({
-    message: '✅ Admin payments API is working!',
-    pendingPayments: pendingPayments,
-    totalPending: pendingPayments.length
-  });
-});
-
-app.patch('/api/admin/approve-payment/:id', (req, res) => {
-  try {
-    const payment = payments.find(p => p.id === req.params.id);
-    if (!payment) return res.status(404).json({ error: 'Payment not found' });
-    
-    if (payment.type !== 'crypto') {
-      return res.status(400).json({ error: 'Only crypto payments can be manually approved' });
-    }
-    
-    payment.status = 'approved';
-    payment.approvedAt = new Date().toISOString();
-    payment.approvedBy = 'admin';
-    
-    // Grant access to user
-    const purchase = {
-      id: Date.now().toString(),
-      userId: payment.userId,
-      product: payment.product,
-      date: new Date().toISOString(),
-      status: 'completed',
-      files: payment.product.files || [],
-      paymentMethod: 'crypto'
-    };
-    
-    purchases.push(purchase);
-    saveData();
-    
-    res.json({ 
-      success: true, 
-      message: 'Payment approved! User now has access to files.',
-      payment 
-    });
-    
-  } catch (error) {
-    console.error('Approval error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+let banners = [
+  {
+    id: 'b1',
+    title: 'Welcome to our Marketplace!',
+    image: '/uploads/banner1.jpg',
+    link: '/products'
+  },
+  {
+    id: 'b2',
+    title: 'Hot Deals This Week 🔥',
+    image: '/uploads/banner2.jpg',
+    link: '/deals'
   }
+];
+
+let categories = [
+  { id: '1', name: 'Business leads', icon: '📊', color: '#3B82F6' },
+  { id: '2', name: 'Crypto',          icon: '💰', color: '#F59E0B' },
+  { id: '3', name: 'Courses',         icon: '📚', color: '#EF4444' },
+  { id: '4', name: 'Software',        icon: '⚙️', color: '#10B981' },
+  { id: '5', name: 'Design',          icon: '🎨', color: '#8B5CF6' },
+  { id: '6', name: 'Lifestyle',       icon: '🌿', color: '#EC4899' }
+];
+
+let settings = {
+  appTitle: 'Digital Marketplace',
+  appSubtitle: 'Sell Leads Easily',
+  accent: '#F0B90B',
+  wallets: {
+    btc: process.env.BTC_ADDRESS || '',
+    eth: process.env.ETH_ADDRESS || '',
+    usdt_trc20: process.env.USDT_ADDRESS || ''
+  }
+};
+
+// --- Settings Routes ---
+app.get('/api/settings', (req, res) => res.json(settings));
+app.patch('/api/settings', (req, res) => {
+  settings = { ...settings, ...req.body };
+  io.emit('settings-updated', settings);
+  res.json(settings);
 });
 
-// User purchases endpoint
-app.get('/api/purchases/:userId', (req, res) => {
-  const userPurchases = purchases.filter(p => p.userId === req.params.userId);
-  res.json(userPurchases);
+// --- Category Routes ---
+app.get('/api/categories', (req, res) => res.json(categories));
+app.post('/api/categories', (req, res) => {
+  const { name, icon = '🗂️', color = '#64748B' } = req.body || {};
+  const trimmed = (name || '').trim();
+  if (!trimmed) return res.status(400).json({ success: false, error: 'Name required' });
+
+  const exists = categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase());
+  if (exists) return res.status(409).json({ success: false, error: 'Category exists' });
+
+  const category = { id: Date.now().toString(), name: trimmed, icon, color };
+  categories.push(category);
+  io.emit('category-added', category);
+  res.status(201).json({ success: true, category });
+});
+app.patch('/api/categories/:id', (req, res) => {
+  const { id } = req.params;
+  const idx = categories.findIndex(c => c.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+
+  categories[idx] = { ...categories[idx], ...req.body };
+  io.emit('category-updated', categories[idx]);
+  res.json({ success: true, category: categories[idx] });
+});
+app.delete('/api/categories/:id', (req, res) => {
+  const { id } = req.params;
+  categories = categories.filter(c => c.id !== id);
+  io.emit('category-deleted', id);
+  res.json({ success: true });
 });
 
-const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Test URLs:`);
-  console.log(`http://localhost:${PORT}/`);
-  console.log(`http://localhost:${PORT}/health`);
-  console.log(`http://localhost:${PORT}/api/crypto-payments`);
-  console.log(`Crypto payment system ready - Manual approval required`);
-  console.log(`PayPal.me payments handled client-side`);
+// --- Product Routes ---
+app.get('/api/products', (req, res) => res.json(products));
+app.post('/api/products', (req, res) => {
+  const product = { id: Date.now().toString(), ...req.body };
+  products.push(product);
+  io.emit('product-added', product);
+  res.status(201).json(product);
+});
+app.patch('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  const idx = products.findIndex(p => p.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+
+  products[idx] = { ...products[idx], ...req.body };
+  io.emit('product-updated', products[idx]);
+  res.json(products[idx]);
+});
+app.delete('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  products = products.filter(p => p.id !== id);
+  io.emit('product-deleted', id);
+  res.json({ success: true });
+});
+
+// --- Banner Routes ---
+app.get('/api/banners', (req, res) => res.json(banners));
+app.post('/api/banners', (req, res) => {
+  const banner = { id: Date.now().toString(), ...req.body };
+  banners.push(banner);
+  io.emit('banner-added', banner);
+  res.status(201).json(banner);
+});
+app.patch('/api/banners/:id', (req, res) => {
+  const { id } = req.params;
+  const idx = banners.findIndex(b => b.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+
+  banners[idx] = { ...banners[idx], ...req.body };
+  io.emit('banner-updated', banners[idx]);
+  res.json(banners[idx]);
+});
+app.delete('/api/banners/:id', (req, res) => {
+  const { id } = req.params;
+  banners = banners.filter(b => b.id !== id);
+  io.emit('banner-deleted', id);
+  res.json({ success: true });
+});
+
+// --- HTTP + WebSocket Setup ---
+const server = createServer(app);
+const io = new SocketIOServer(server, {
+  cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }
+});
+
+io.on('connection', (socket) => {
+  console.log('✅ WebSocket client connected');
+  socket.on('disconnect', () => console.log('❌ WebSocket client disconnected'));
+});
+
+// --- Start Server ---
+server.listen(basePort, () => {
+  const publicURL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${basePort}`;
+  console.log(`🚀 API + WebSocket running at ${publicURL}`);
 });
