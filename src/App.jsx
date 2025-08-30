@@ -92,55 +92,43 @@ function App() {
     setCategoryProducts(getProductsByCategory(category.name));
   };
 
-  const renderTopNavigation = () => (
-    <div className="header-with-nav">
-      <div className="app-header">
-        <h1 className="app-title">Digital Marketplace</h1>
-        <p className="app-subtitle">Instant digital goods</p>
-      </div>
-      <nav className="top-navigation">
-        <button
-          className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveNav('home');
-            safeNavigate('home');
-          }}
-        >
-          🏠 Home
-        </button>
-        <button
-          className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveNav('cart');
-            safeNavigate('cart');
-          }}
-        >
-          🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-        </button>
-        <button
-          className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveNav('downloads');
-            safeNavigate('downloads');
-          }}
-        >
-          📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}
-        </button>
-      </nav>
+const renderTopNavigation = () => (
+  <div className="header-with-nav">
+    <div className="app-header">
+      <h1 className="app-title">Digital Marketplace</h1>
+      <p className="app-subtitle">Instant digital goods</p>
     </div>
-  );
-  
-{isAdmin && (
-  <button
-    className={`nav-btn ${activeNav === 'admin' ? 'active' : ''}`}
-    onClick={() => {
-      setActiveNav('admin');
-      safeNavigate('admin');
-    }}
-  >
-    ⚙️ Admin
-  </button>
-)}
+    <nav className="top-navigation">
+      <button
+        className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`}
+        onClick={() => { setActiveNav('home'); safeNavigate('home'); }}
+      >
+        🏠 Home
+      </button>
+      <button
+        className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`}
+        onClick={() => { setActiveNav('cart'); safeNavigate('cart'); }}
+      >
+        🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+      </button>
+      <button
+        className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`}
+        onClick={() => { setActiveNav('downloads'); safeNavigate('downloads'); }}
+      >
+        📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}
+      </button>
+
+      {isAdmin && (
+        <button
+          className={`nav-btn ${activeNav === 'admin' ? 'active' : ''}`}
+          onClick={() => { setActiveNav('admin'); safeNavigate('admin'); }}
+        >
+          ⚙️ Admin
+        </button>
+      )}
+    </nav>
+  </div>
+);
 
   const renderHome = () => (
     <div className="view">
