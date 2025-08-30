@@ -129,6 +129,18 @@ function App() {
       </nav>
     </div>
   );
+  
+{isAdmin && (
+  <button
+    className={`nav-btn ${activeNav === 'admin' ? 'active' : ''}`}
+    onClick={() => {
+      setActiveNav('admin');
+      safeNavigate('admin');
+    }}
+  >
+    ⚙️ Admin
+  </button>
+)}
 
   const renderHome = () => (
     <div className="view">
