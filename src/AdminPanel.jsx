@@ -3,7 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './AdminPanel.css';
 import { io } from 'socket.io-client';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3002';
+const API_BASE =
+  import.meta.env.VITE_API_BASE || 'https://digital-goods-app-tqac.onrender.com';
 
 const AdminPanel = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState('batches');
