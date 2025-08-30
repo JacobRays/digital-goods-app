@@ -14,6 +14,7 @@ const Payment = ({ product, onClose }) => {
   const [purchase, setPurchase] = useState(null);
   const [settings, setSettings] = useState(null);
   const [txHash, setTxHash] = useState('');
+  const [copied, setCopied] = useState(false); // New state for copy feedback
 
   // stable user id
   const userId = useMemo(() => {
@@ -61,6 +62,34 @@ const Payment = ({ product, onClose }) => {
   }), [settings]);
 
   const cryptoAddress = wallets[selectedCrypto];
+
+  // Copy address function with feedback
+  const copyAddress = async () => {
+    if (!cryptoAddress) return;
+    
+    try {
+      await navigator.clipboard.writeText(cryptoAddress);
+      setCopied(true);
+      // Reset the "Copied!" message after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy address:', err);
+      // Fallback for browsers that don't support clipboard API
+      const textArea = document.createElement('textarea');
+      textArea.value = cryptoAddress;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+        alert('Failed to copy address. Please copy it manually.');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
 
   const handlePayPal = async () => {
     setIsProcessing(true);
@@ -186,7 +215,7 @@ const Payment = ({ product, onClose }) => {
         <div className="method-details">
           {selectedMethod === 'paypal' && (
             <div className="paypal-info">
-              <p>You’ll be redirected to PayPal.me to complete your payment.</p>
+              <p>You'll be redirected to PayPal.me to complete your payment.</p>
               <button className="confirm-btn" onClick={handlePayPal} disabled={isProcessing}>
                 {isProcessing ? 'Redirecting...' : 'Pay with PayPal'}
               </button>
@@ -208,10 +237,10 @@ const Payment = ({ product, onClose }) => {
                   <span className="wallet">{cryptoAddress || 'Not set'}</span>
                   {cryptoAddress && (
                     <button
-                      className="copy-btn"
-                      onClick={() => navigator.clipboard.writeText(cryptoAddress)}
+                      className={`copy-btn ${copied ? 'copied' : ''}`}
+                      onClick={copyAddress}
                     >
-                      Copy
+                      {copied ? '✓ Copied!' : 'Copy'}
                     </button>
                   )}
                 </div>
@@ -267,17 +296,16 @@ const Payment = ({ product, onClose }) => {
                 {purchase.files?.map((file, idx) => (
                   <a key={idx} href={`${API_BASE}${file.url}`} download={file.name} className="download-btn">
                     Download {file.name}
-                    <div className="receipt-actions">
-                   <button
-                     className="back-to-store-btn"
-                     onClick={() => window.location.href = '/'}
-                     >
-                     ← Back to Store
-                    </button>
-                    </div>
-
                   </a>
                 ))}
+                <div className="receipt-actions">
+                  <button
+                    className="back-to-store-btn"
+                    onClick={() => window.location.href = '/'}
+                  >
+                    ← Back to Store
+                  </button>
+                </div>
               </div>
             )}
 
