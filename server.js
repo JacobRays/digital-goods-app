@@ -187,7 +187,41 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => console.log('❌ WebSocket client disconnected'));
 });
 
-// --- Start Server ---
+// --- Purchases Route ---
+let purchases = [
+  {
+    id: 'order1',
+    userId: 'user_abc123',
+    productName: 'Crypto Leads Pack',
+    status: 'completed',
+    files: [
+      { url: '/uploads/crypto-leads.csv', name: 'crypto-leads.csv' }
+    ]
+  },
+  {
+    id: 'order2',
+    userId: 'user_xyz789',
+    productName: 'Design Templates',
+    status: 'pending',
+    files: []
+  }
+];
+
+app.get('/api/purchases', (req, res) => {
+  const { status, userId } = req.query;
+  let filtered = purchases;
+
+  if (status) {
+    filtered = filtered.filter(p => p.status === status);
+  }
+
+  if (userId) {
+    filtered = filtered.filter(p => p.userId === userId);
+  }
+
+  res.json(filtered);
+});
+
 server.listen(basePort, () => {
   const publicURL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${basePort}`;
   console.log(`🚀 API + WebSocket running at ${publicURL}`);
