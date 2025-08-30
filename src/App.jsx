@@ -309,7 +309,6 @@ function App() {
   );
 
   const renderAdmin = () => <AdminPanel onBack={() => safeNavigate('home')} />;
-  );
 
   return (
     <div className="app">
