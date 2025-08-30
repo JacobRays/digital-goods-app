@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import './App-new.css';
 import AdminPanel from './AdminPanel';
 import Payment from './Payment';
 import DownloadCenter from './DownloadCenter';
-import BatchSelection from './BatchSelection';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://digital-goods-app-tqac.onrender.com';
 
@@ -23,30 +21,44 @@ function App() {
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
   const [purchases, setPurchases] = useState([]);
-  const [showBatchSelection, setShowBatchSelection] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [cartItems, setCartItems] = useState([]);
-  const [availableBatches, setAvailableBatches] = useState([]);
+  const [categories, setCategories] = useState([]);
+
+  // Reusable function to fetch products
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/products`);
+      const data = await response.json();
+      setProducts(data);
+    } catch (e) {
+      console.error('Error fetching products', e);
+    }
+  };
+
+  // Reusable function to fetch categories
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/categories`);
+      const data = await response.json();
+      setCategories(data);
+    } catch (e) {
+      console.error('Error fetching categories', e);
+    }
+  };
 
   // Fetch live categories & products on mount
   useEffect(() => {
-    fetch(`${API_BASE}/api/categories`)
-      .then((res) => res.json())
-      .then((data) => setAvailableBatches(data)) // reusing availableBatches
-      .catch((e) => console.error('Error fetching categories', e));
-
-    fetch(`${API_BASE}/api/products`)
-      .then((res) => res.json())
-      .then((data) => setProducts(data))
-      .catch((e) => console.error('Error fetching products', e));
+    fetchCategories();
+    fetchProducts();
   }, []);
 
-  // Telegram / User setup
+  // Telegram / User setup (mock)
   useEffect(() => {
     setIsAdmin(true);
     setTimeout(() => {
       setTelegramReady(true);
-      setUser({ first_name: "User" });
+      setUser({ first_name: 'User' });
     }, 500);
   }, []);
 
@@ -55,8 +67,13 @@ function App() {
       setActiveView(view);
       setActiveNav(view === 'home' ? 'home' : activeNav);
       setShowPayment(false);
-      setShowBatchSelection(false);
       setSelectedBatch(null);
+      
+      // Refetch products when navigating to home to ensure we have the latest data
+      if (view === 'home') {
+        fetchProducts();
+        fetchCategories();
+      }
     }, delay);
   };
 
@@ -66,7 +83,7 @@ function App() {
   };
 
   const handleAddToCart = (batch) => {
-    setCartItems([...cartItems, batch]);
+    setCartItems((prev) => [...prev, batch]);
     setCartCount((c) => c + 1);
     alert(`${batch.name} added to cart!`);
   };
@@ -92,43 +109,43 @@ function App() {
     setCategoryProducts(getProductsByCategory(category.name));
   };
 
-const renderTopNavigation = () => (
-  <div className="header-with-nav">
-    <div className="app-header">
-      <h1 className="app-title">Digital Marketplace</h1>
-      <p className="app-subtitle">Instant digital goods</p>
-    </div>
-    <nav className="top-navigation">
-      <button
-        className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`}
-        onClick={() => { setActiveNav('home'); safeNavigate('home'); }}
-      >
-        🏠 Home
-      </button>
-      <button
-        className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`}
-        onClick={() => { setActiveNav('cart'); safeNavigate('cart'); }}
-      >
-        🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-      </button>
-      <button
-        className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`}
-        onClick={() => { setActiveNav('downloads'); safeNavigate('downloads'); }}
-      >
-        📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}
-      </button>
-
-      {isAdmin && (
+  const renderTopNavigation = () => (
+    <div className="header-with-nav">
+      <div className="app-header">
+        <h1 className="app-title">Digital Marketplace</h1>
+        <p className="app-subtitle">Instant digital goods</p>
+      </div>
+      <nav className="top-navigation">
         <button
-          className={`nav-btn ${activeNav === 'admin' ? 'active' : ''}`}
-          onClick={() => { setActiveNav('admin'); safeNavigate('admin'); }}
+          className={`nav-btn ${activeNav === 'home' ? 'active' : ''}`}
+          onClick={() => { setActiveNav('home'); safeNavigate('home'); }}
         >
-          ⚙️ Admin
+          🏠 Home
         </button>
-      )}
-    </nav>
-  </div>
-);
+        <button
+          className={`nav-btn ${activeNav === 'cart' ? 'active' : ''}`}
+          onClick={() => { setActiveNav('cart'); safeNavigate('cart'); }}
+        >
+          🛒 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+        </button>
+        <button
+          className={`nav-btn ${activeNav === 'downloads' ? 'active' : ''}`}
+          onClick={() => { setActiveNav('downloads'); safeNavigate('downloads'); }}
+        >
+          📥 My Files {purchases.length > 0 && <span className="cart-badge">{purchases.length}</span>}
+        </button>
+
+        {isAdmin && (
+          <button
+            className={`nav-btn ${activeNav === 'admin' ? 'active' : ''}`}
+            onClick={() => { setActiveNav('admin'); safeNavigate('admin'); }}
+          >
+            ⚙️ Admin
+          </button>
+        )}
+      </nav>
+    </div>
+  );
 
   const renderHome = () => (
     <div className="view">
@@ -150,7 +167,7 @@ const renderTopNavigation = () => (
       <section className="section">
         <h2 className="section-title">Categories</h2>
         <div className="categories-grid">
-          {availableBatches.map((category) => (
+          {categories.map((category) => (
             <div
               key={category.id}
               className="category-item"
@@ -206,7 +223,9 @@ const renderTopNavigation = () => (
         <button className="back-btn" onClick={() => safeNavigate('home')}>
           ← Back to Categories
         </button>
-        <h2>{selectedCategory?.icon} {selectedCategory?.name}</h2>
+        <h2>
+          {selectedCategory?.icon} {selectedCategory?.name}
+        </h2>
         <p className="category-description">Select from our available lead batches</p>
       </div>
       <div className="products-grid">
@@ -253,7 +272,7 @@ const renderTopNavigation = () => (
         {cartItems.length === 0 ? (
           <div className="empty-cart">
             <p>Your cart is empty</p>
-            <button className="continue-shopping-btn" onClick={() => setActiveView('home')}>
+            <button className="continue-shopping-btn" onClick={() => safeNavigate('home', 0)}>
               Continue Shopping
             </button>
           </div>
@@ -279,7 +298,11 @@ const renderTopNavigation = () => (
               <button
                 className="checkout-btn"
                 onClick={() => {
-                  setSelectedProduct({ name: 'Cart Items', price: calculateCartTotal(), description: 'Multiple products in cart' });
+                  setSelectedProduct({
+                    name: 'Cart Items',
+                    price: calculateCartTotal(),
+                    description: 'Multiple products in cart',
+                  });
                   setShowPayment(true);
                 }}
               >
@@ -296,7 +319,16 @@ const renderTopNavigation = () => (
     <DownloadCenter purchases={purchases} onBack={() => safeNavigate('home')} />
   );
 
-  const renderAdmin = () => <AdminPanel onBack={() => safeNavigate('home')} />;
+  const renderAdmin = () => (
+    <AdminPanel 
+      onBack={() => {
+        // Refresh products and categories when leaving admin panel
+        fetchProducts();
+        fetchCategories();
+        safeNavigate('home');
+      }} 
+    />
+  );
 
   return (
     <div className="app">
@@ -321,7 +353,7 @@ const renderTopNavigation = () => (
                 product: selectedBatch || selectedProduct,
                 date: new Date().toLocaleString(),
                 status: immediateAccess ? 'completed' : 'pending',
-                files: immediateAccess ? (selectedBatch || selectedProduct).files : []
+                files: immediateAccess ? (selectedBatch || selectedProduct).files : [],
               };
               setPurchases((p) => [...p, purchase]);
               safeNavigate(immediateAccess ? 'downloads' : 'home');
