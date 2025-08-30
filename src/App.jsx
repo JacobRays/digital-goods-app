@@ -296,8 +296,7 @@ function App() {
     <DownloadCenter purchases={purchases} onBack={() => safeNavigate('home')} />
   );
 
-  {renderAdmin()}
-
+  const renderAdmin = () => <AdminPanel onBack={() => safeNavigate('home')} />;
   );
 
   return (
