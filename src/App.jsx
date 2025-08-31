@@ -201,7 +201,6 @@ function App() {
           <div className="loading">Loading categories...</div>
         ) : (
           <div className="categories-grid">
-            {/* Changed from category.id to category._id */}
             {categories.map((category) => (
               <div
                 key={category._id}
@@ -233,7 +232,6 @@ function App() {
           <div className="loading">Loading products...</div>
         ) : (
           <div className="products-grid">
-            {/* Changed from product.id to product._id */}
             {featuredProducts.map((product) => (
               <div key={product._id} className="product-card">
                 <div className="product-image">{product.thumbnail}</div>
@@ -276,7 +274,6 @@ function App() {
         <p className="category-description">Select from our available lead batches</p>
       </div>
       <div className="products-grid">
-        {/* Changed from product.id to product._id */}
         {categoryProducts.map((product) => (
           <div key={product._id} className="product-card">
             <div className="product-image">{product.thumbnail}</div>
