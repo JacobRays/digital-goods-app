@@ -85,17 +85,23 @@ const AdminPanel = ({ onBack }) => {
     try {
       const form = new FormData();
       files.forEach((f) => form.append('files', f));
-      const resp = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+      const resp = await fetch(`${API_BASE}/api/upload`, { 
+        method: 'POST', 
+        body: form 
+      });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'File upload failed.');
         return;
       }
+      
       const result = await resp.json();
       setNewBatch((prev) => ({
         ...prev,
         files: [...prev.files, ...(result.files || [])],
       }));
+      alert('Files uploaded successfully!');
     } catch (err) {
       console.error('Upload error:', err);
       alert('Error uploading files.');
@@ -112,6 +118,7 @@ const AdminPanel = ({ onBack }) => {
   // ---- Add / Remove product ----
   const addNewBatch = async () => {
     if (!newBatch.name || !newBatch.price) return alert('Name and price are required.');
+    
     const body = {
       name: newBatch.name,
       price: Number(newBatch.price),
@@ -124,17 +131,20 @@ const AdminPanel = ({ onBack }) => {
       salePercent: newBatch.onSale ? Number(newBatch.salePercent || 0) : 0,
       originalPrice: newBatch.onSale ? Number(newBatch.price) : null,
     };
+    
     try {
       const resp = await fetch(`${API_BASE}/api/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to add batch.');
         return;
       }
+      
       const prod = await resp.json();
       setProducts((prev) => [prod, ...prev]);
       setNewBatch({
@@ -182,17 +192,20 @@ const AdminPanel = ({ onBack }) => {
         ? Number((product.price * (1 - salePercent / 100)).toFixed(2))
         : product.originalPrice || product.price,
     };
+    
     try {
       const resp = await fetch(`${API_BASE}/api/products/${product._id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to toggle sale.');
         return;
       }
+      
       const updated = await resp.json();
       setProducts((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
     } catch (e) {
@@ -209,11 +222,13 @@ const AdminPanel = ({ onBack }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'completed' }),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to approve payment.');
         return;
       }
+      
       const updated = await resp.json();
       setPurchases((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
       alert('Payment approved! User now has access to download files.');
@@ -230,11 +245,13 @@ const AdminPanel = ({ onBack }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'rejected' }),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to reject payment.');
         return;
       }
+      
       const updated = await resp.json();
       setPurchases((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
       alert('Payment rejected.');
@@ -248,15 +265,21 @@ const AdminPanel = ({ onBack }) => {
   const uploadIcon = async (e, setter) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    
     try {
       const form = new FormData();
       files.forEach((f) => form.append('files', f));
-      const resp = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+      const resp = await fetch(`${API_BASE}/api/upload`, { 
+        method: 'POST', 
+        body: form 
+      });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Icon upload failed.');
         return;
       }
+      
       const result = await resp.json();
       const iconUrl = result.files?.[0]?.url || null;
       setter(iconUrl);
@@ -268,6 +291,7 @@ const AdminPanel = ({ onBack }) => {
 
   const addNewCategory = async () => {
     if (!newCategory.name) return alert('Category name required.');
+    
     try {
       const body = { ...newCategory };
       const resp = await fetch(`${API_BASE}/api/categories`, {
@@ -275,11 +299,13 @@ const AdminPanel = ({ onBack }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to add category.');
         return;
       }
+      
       const cat = await resp.json();
       setCategories((prev) => [cat, ...prev]);
       setNewCategory({ name: '', icon: '📦', color: '#6B7280', customIcon: null });
@@ -298,14 +324,17 @@ const AdminPanel = ({ onBack }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         alert(err.error || 'Failed to update category.');
         return;
       }
+      
       const updated = await resp.json();
       setCategories((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
       setEditingCategory(null);
+      alert('Category updated successfully!');
     } catch (e) {
       console.error('Update category error:', e);
       alert('Error updating category.');
@@ -317,6 +346,7 @@ const AdminPanel = ({ onBack }) => {
       const resp = await fetch(`${API_BASE}/api/categories/${id}`, { method: 'DELETE' });
       if (resp.ok) {
         setCategories((prev) => prev.filter((c) => c._id !== id));
+        alert('Category deleted successfully!');
       } else {
         const e = await resp.json().catch(() => ({}));
         alert(e.error || 'Cannot remove category.');
@@ -729,7 +759,7 @@ const AdminPanel = ({ onBack }) => {
         </div>
       )}
 
-      {/* SETTINGS */}
+      {/* SETTINGS TAB - RESTORED AND WORKING */}
       {activeTab === 'settings' && settings && (
         <div className="product-form">
           <h3>Store Settings</h3>
@@ -860,7 +890,7 @@ const AdminPanel = ({ onBack }) => {
                   '--accent',
                   updated.accent || '#F0B90B'
                 );
-                alert('Settings saved.');
+                alert('Settings saved successfully!');
               } catch (e) {
                 console.error('Save settings error:', e);
                 alert('Error saving settings.');
