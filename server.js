@@ -9,15 +9,21 @@ import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 const app = express();
 const basePort = process.env.PORT || 3002;
 
-// --- Enhanced CORS configuration ---
-// Allow requests from your Vercel frontend and local development
-app.use(cors({ 
-  origin: [
-    'http://localhost:3000', 
-    'http://localhost:5173',
-    'https://*.vercel.app',
-    'https://*.onrender.com'
-  ], 
+// --- CORS ---
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  /\.vercel\.app$/,
+  /\.onrender\.com$/
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.some(o => o instanceof RegExp ? o.test(origin) : o === origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
@@ -25,28 +31,22 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
 
-// --- Ensure uploads folder exists ---
+// Ensure uploads folder exists
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
-// --- HTTP + WebSocket Setup ---
-// Moved up so io is available to all routes
+// --- HTTP + WebSocket ---
 const server = createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { 
-    origin: [
-      'http://localhost:3000', 
-      'http://localhost:5173',
-      'https://*.vercel.app',
-      'https://*.onrender.com'
-    ], 
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'] 
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE']
   }
 });
 
 // --- MongoDB Connection ---
 const uri = process.env.MONGODB_URI;
 if (!uri) {
-  console.error('❌ MONGODB_URI environment variable is not set');
+  console.error('❌ MONGODB_URI not set');
   process.exit(1);
 }
 
@@ -54,7 +54,7 @@ const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
-    deprecationErrors: true,
+    deprecationErrors: true
   }
 });
 
@@ -70,72 +70,38 @@ async function connectToDatabase() {
     bannersCollection = db.collection('banners');
     purchasesCollection = db.collection('purchases');
     settingsCollection = db.collection('settings');
-    
-    console.log('✅ Successfully connected to MongoDB Atlas!');
-    
-    // Create initial data if collections are empty
+    console.log('✅ Connected to MongoDB Atlas');
     await initializeData();
-    
   } catch (err) {
-    console.error('❌ Failed to connect to MongoDB:', err);
+    console.error('❌ MongoDB connection failed:', err);
     process.exit(1);
   }
 }
 
-// Initialize with sample data if collections are empty
+// --- Seed Default Data ---
 async function initializeData() {
   try {
-    // Check if categories collection is empty
-    const categoryCount = await categoriesCollection.countDocuments();
-    if (categoryCount === 0) {
-      const defaultCategories = [
+    if (await categoriesCollection.countDocuments() === 0) {
+      await categoriesCollection.insertMany([
         { _id: new ObjectId(), name: 'Business leads', icon: '📊', color: '#3B82F6' },
         { _id: new ObjectId(), name: 'Crypto', icon: '💰', color: '#F59E0B' },
         { _id: new ObjectId(), name: 'Courses', icon: '📚', color: '#EF4444' },
         { _id: new ObjectId(), name: 'Software', icon: '⚙️', color: '#10B981' },
         { _id: new ObjectId(), name: 'Design', icon: '🎨', color: '#8B5CF6' },
         { _id: new ObjectId(), name: 'Lifestyle', icon: '🌿', color: '#EC4899' }
-      ];
-      await categoriesCollection.insertMany(defaultCategories);
-      console.log('✅ Added default categories');
+      ]);
+      console.log('✅ Default categories added');
     }
 
-    // Check if products collection is empty
-    const productCount = await productsCollection.countDocuments();
-    if (productCount === 0) {
-      const defaultProducts = [
-        {
-          _id: new ObjectId(),
-          name: 'Sample Product 1',
-          price: 19.99,
-          description: 'A great starter product',
-          category: 'Business leads',
-          thumbnail: '📦',
-          rating: 4.5,
-          files: [],
-          onSale: false,
-          salePercent: 0
-        },
-        {
-          _id: new ObjectId(),
-          name: 'Sample Product 2',
-          price: 29.99,
-          description: 'Another amazing product',
-          category: 'Crypto',
-          thumbnail: '📦',
-          rating: 4.2,
-          files: [],
-          onSale: true,
-          salePercent: 15
-        }
-      ];
-      await productsCollection.insertMany(defaultProducts);
-      console.log('✅ Added default products');
+    if (await productsCollection.countDocuments() === 0) {
+      await productsCollection.insertMany([
+        { _id: new ObjectId(), name: 'Sample Product 1', price: 19.99, description: 'A great starter product', category: 'Business leads', thumbnail: '📦', rating: 4.5, files: [], onSale: false, salePercent: 0 },
+        { _id: new ObjectId(), name: 'Sample Product 2', price: 29.99, description: 'Another amazing product', category: 'Crypto', thumbnail: '📦', rating: 4.2, files: [], onSale: true, salePercent: 15 }
+      ]);
+      console.log('✅ Default products added');
     }
 
-    // Check if settings exist
-    const existingSettings = await settingsCollection.findOne({});
-    if (!existingSettings) {
+    if (!await settingsCollection.findOne({})) {
       await settingsCollection.insertOne({
         appTitle: 'Digital Marketplace',
         appSubtitle: 'Sell Leads Easily',
@@ -146,7 +112,7 @@ async function initializeData() {
           usdt_trc20: process.env.USDT_ADDRESS || ''
         }
       });
-      console.log('✅ Added default settings');
+      console.log('✅ Default settings added');
     }
   } catch (error) {
     console.error('Error initializing data:', error);
@@ -155,37 +121,23 @@ async function initializeData() {
 
 connectToDatabase();
 
-// --- Socket.io connection handling ---
+// --- WebSocket Events ---
 io.on('connection', (socket) => {
   console.log('✅ WebSocket client connected');
   socket.on('disconnect', () => console.log('❌ WebSocket client disconnected'));
 });
 
-// --- Example test route ---
-app.get('/', (req, res) => {
-  res.send('🚀 Server is running with MongoDB!');
-});
-
-// --- Health check endpoint ---
+// --- Health Check ---
 app.get('/api/health', async (req, res) => {
   try {
-    // Check if MongoDB is connected
     await db.command({ ping: 1 });
-    res.json({ 
-      status: 'OK', 
-      database: 'Connected',
-      timestamp: new Date().toISOString()
-    });
+    res.json({ status: 'OK', database: 'Connected', timestamp: new Date().toISOString() });
   } catch (error) {
-    res.status(500).json({ 
-      status: 'Error', 
-      database: 'Disconnected',
-      error: error.message 
-    });
+    res.status(500).json({ status: 'Error', database: 'Disconnected', error: error.message });
   }
 });
 
-// --- File Upload Setup ---
+// --- File Upload ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
@@ -194,17 +146,13 @@ const upload = multer({ storage });
 
 app.post('/api/upload', upload.array('files'), (req, res) => {
   try {
-    const files = (req.files || []).map(f => ({
-      url: `/uploads/${f.filename}`,
-      name: f.originalname
-    }));
+    const files = (req.files || []).map(f => ({ url: `/uploads/${f.filename}`, name: f.originalname }));
     res.json({ files });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'File upload failed' });
   }
 });
-
 // --- Settings Routes ---
 app.get('/api/settings', async (req, res) => {
   try {
@@ -218,11 +166,7 @@ app.get('/api/settings', async (req, res) => {
 
 app.patch('/api/settings', async (req, res) => {
   try {
-    const result = await settingsCollection.updateOne(
-      {},
-      { $set: req.body },
-      { upsert: true }
-    );
+    await settingsCollection.updateOne({}, { $set: req.body }, { upsert: true });
     const updatedSettings = await settingsCollection.findOne({});
     io.emit('settings-updated', updatedSettings);
     res.json(updatedSettings);
@@ -247,29 +191,15 @@ app.post('/api/categories', async (req, res) => {
   try {
     const { name, icon = '📦', color = '#6B7280' } = req.body || {};
     const trimmed = (name || '').trim();
-    
-    if (!trimmed) {
-      return res.status(400).json({ success: false, error: 'Name required' });
-    }
+    if (!trimmed) return res.status(400).json({ error: 'Name required' });
 
-    const exists = await categoriesCollection.findOne({ 
-      name: { $regex: new RegExp(trimmed, 'i') } 
-    });
-    
-    if (exists) {
-      return res.status(409).json({ success: false, error: 'Category exists' });
-    }
+    const exists = await categoriesCollection.findOne({ name: { $regex: new RegExp(trimmed, 'i') } });
+    if (exists) return res.status(409).json({ error: 'Category exists' });
 
-    const category = { 
-      _id: new ObjectId(), 
-      name: trimmed, 
-      icon, 
-      color 
-    };
-    
+    const category = { _id: new ObjectId(), name: trimmed, icon, color };
     await categoriesCollection.insertOne(category);
     io.emit('category-added', category);
-    res.status(201).json({ success: true, category });
+    res.status(201).json(category);
   } catch (error) {
     console.error('Category creation error:', error);
     res.status(500).json({ error: error.message });
@@ -279,18 +209,12 @@ app.post('/api/categories', async (req, res) => {
 app.patch('/api/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await categoriesCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: req.body }
-    );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
+    const result = await categoriesCollection.updateOne({ _id: new ObjectId(id) }, { $set: req.body });
+    if (!result.matchedCount) return res.status(404).json({ error: 'Category not found' });
 
     const updatedCategory = await categoriesCollection.findOne({ _id: new ObjectId(id) });
     io.emit('category-updated', updatedCategory);
-    res.json({ success: true, category: updatedCategory });
+    res.json(updatedCategory);
   } catch (error) {
     console.error('Category update error:', error);
     res.status(500).json({ error: error.message });
@@ -301,11 +225,8 @@ app.delete('/api/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await categoriesCollection.deleteOne({ _id: new ObjectId(id) });
-    
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-    
+    if (!result.deletedCount) return res.status(404).json({ error: 'Category not found' });
+
     io.emit('category-deleted', id);
     res.json({ success: true });
   } catch (error) {
@@ -327,12 +248,7 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const product = { 
-      _id: new ObjectId(), 
-      ...req.body,
-      createdAt: new Date()
-    };
-    
+    const product = { _id: new ObjectId(), ...req.body, createdAt: new Date() };
     await productsCollection.insertOne(product);
     io.emit('product-added', product);
     res.status(201).json(product);
@@ -349,10 +265,7 @@ app.patch('/api/products/:id', async (req, res) => {
       { _id: new ObjectId(id) },
       { $set: { ...req.body, updatedAt: new Date() } }
     );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
+    if (!result.matchedCount) return res.status(404).json({ error: 'Product not found' });
 
     const updatedProduct = await productsCollection.findOne({ _id: new ObjectId(id) });
     io.emit('product-updated', updatedProduct);
@@ -367,11 +280,8 @@ app.delete('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
-    
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    
+    if (!result.deletedCount) return res.status(404).json({ error: 'Product not found' });
+
     io.emit('product-deleted', id);
     res.json({ success: true });
   } catch (error) {
@@ -393,11 +303,7 @@ app.get('/api/banners', async (req, res) => {
 
 app.post('/api/banners', async (req, res) => {
   try {
-    const banner = { 
-      _id: new ObjectId(), 
-      ...req.body 
-    };
-    
+    const banner = { _id: new ObjectId(), ...req.body };
     await bannersCollection.insertOne(banner);
     io.emit('banner-added', banner);
     res.status(201).json(banner);
@@ -410,14 +316,8 @@ app.post('/api/banners', async (req, res) => {
 app.patch('/api/banners/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await bannersCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: req.body }
-    );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Banner not found' });
-    }
+    const result = await bannersCollection.updateOne({ _id: new ObjectId(id) }, { $set: req.body });
+    if (!result.matchedCount) return res.status(404).json({ error: 'Banner not found' });
 
     const updatedBanner = await bannersCollection.findOne({ _id: new ObjectId(id) });
     io.emit('banner-updated', updatedBanner);
@@ -432,11 +332,8 @@ app.delete('/api/banners/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await bannersCollection.deleteOne({ _id: new ObjectId(id) });
-    
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Banner not found' });
-    }
-    
+    if (!result.deletedCount) return res.status(404).json({ error: 'Banner not found' });
+
     io.emit('banner-deleted', id);
     res.json({ success: true });
   } catch (error) {
@@ -445,19 +342,13 @@ app.delete('/api/banners/:id', async (req, res) => {
   }
 });
 
-// --- Purchases Route ---
+// --- Purchases Routes ---
 app.get('/api/purchases', async (req, res) => {
   try {
     const { status, userId } = req.query;
-    let query = {};
-    
-    if (status) {
-      query.status = status;
-    }
-    
-    if (userId) {
-      query.userId = userId;
-    }
+    const query = {};
+    if (status) query.status = status;
+    if (userId) query.userId = userId;
 
     const purchases = await purchasesCollection.find(query).toArray();
     res.json(purchases);
@@ -469,12 +360,7 @@ app.get('/api/purchases', async (req, res) => {
 
 app.post('/api/purchases', async (req, res) => {
   try {
-    const purchase = {
-      _id: new ObjectId(),
-      ...req.body,
-      createdAt: new Date()
-    };
-    
+    const purchase = { _id: new ObjectId(), ...req.body, createdAt: new Date() };
     await purchasesCollection.insertOne(purchase);
     res.status(201).json(purchase);
   } catch (error) {
@@ -486,14 +372,8 @@ app.post('/api/purchases', async (req, res) => {
 app.patch('/api/purchases/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await purchasesCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: req.body }
-    );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Purchase not found' });
-    }
+    const result = await purchasesCollection.updateOne({ _id: new ObjectId(id) }, { $set: req.body });
+    if (!result.matchedCount) return res.status(404).json({ error: 'Purchase not found' });
 
     const updatedPurchase = await purchasesCollection.findOne({ _id: new ObjectId(id) });
     io.emit('purchase-updated', updatedPurchase);
@@ -501,17 +381,28 @@ app.patch('/api/purchases/:id', async (req, res) => {
   } catch (error) {
     console.error('Purchase update error:', error);
     res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message });
   }
 });
 
-server.listen(basePort, () => {
-  const publicURL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${basePort}`;
-  console.log(`🚀 API + WebSocket running at ${publicURL}`);
+// --- 404 Handler for Unknown API Routes ---
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API route not found' });
 });
 
-// Graceful shutdown
+// --- Start Server ---
+server.listen(basePort, () => {
+  console.log(`🚀 Server running on port ${basePort}`);
+});
+
+// --- Graceful Shutdown ---
 process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
-  await client.close();
+  console.log('\n🛑 Shutting down server...');
+  try {
+    await client.close();
+    console.log('✅ MongoDB connection closed.');
+  } catch (err) {
+    console.error('Error closing MongoDB connection:', err);
+  }
   process.exit(0);
 });
