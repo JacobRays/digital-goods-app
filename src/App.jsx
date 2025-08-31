@@ -203,7 +203,7 @@ function App() {
           <div className="categories-grid">
             {categories.map((category) => (
               <div
-                key={category._id} {/* Changed from category.id to category._id */}
+                key={category._id}
                 className="category-item"
                 onClick={() => handleCategorySelect(category)}
               >
