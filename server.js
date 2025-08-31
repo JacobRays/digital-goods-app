@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import multer from 'multer';
 import fs from 'fs';
+import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 
 const app = express();
 const basePort = process.env.PORT || 3002;
@@ -16,9 +17,56 @@ app.use('/uploads', express.static('uploads'));
 // --- Ensure uploads folder exists ---
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
+// --- MongoDB Connection ---
+const uri = process.env.MONGODB_URI;
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+let db;
+let productsCollection, categoriesCollection, bannersCollection, purchasesCollection, settingsCollection;
+
+async function connectToDatabase() {
+  try {
+    await client.connect();
+    db = client.db();
+    productsCollection = db.collection('products');
+    categoriesCollection = db.collection('categories');
+    bannersCollection = db.collection('banners');
+    purchasesCollection = db.collection('purchases');
+    settingsCollection = db.collection('settings');
+    
+    // Create initial settings if they don't exist
+    const existingSettings = await settingsCollection.findOne({});
+    if (!existingSettings) {
+      await settingsCollection.insertOne({
+        appTitle: 'Digital Marketplace',
+        appSubtitle: 'Sell Leads Easily',
+        accent: '#F0B90B',
+        wallets: {
+          btc: process.env.BTC_ADDRESS || '',
+          eth: process.env.ETH_ADDRESS || '',
+          usdt_trc20: process.env.USDT_ADDRESS || ''
+        }
+      });
+    }
+    
+    console.log('✅ Successfully connected to MongoDB Atlas!');
+  } catch (err) {
+    console.error('❌ Failed to connect to MongoDB:', err);
+    process.exit(1);
+  }
+}
+
+connectToDatabase();
+
 // --- Example test route ---
 app.get('/', (req, res) => {
-  res.send('🚀 Server is running!');
+  res.send('🚀 Server is running with MongoDB!');
 });
 
 // --- File Upload Setup ---
@@ -36,144 +84,229 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
   res.json({ files });
 });
 
-// --- In-memory Data ---
-let products = [
-  {
-    id: 'p1',
-    name: 'Sample Product 1',
-    price: '$19.99',
-    image: '/uploads/sample1.jpg',
-    description: 'A great starter product'
-  },
-  {
-    id: 'p2',
-    name: 'Sample Product 2',
-    price: '$29.99',
-    image: '/uploads/sample2.jpg',
-    description: 'Another amazing product'
-  }
-];
-
-let banners = [
-  {
-    id: 'b1',
-    title: 'Welcome to our Marketplace!',
-    image: '/uploads/banner1.jpg',
-    link: '/products'
-  },
-  {
-    id: 'b2',
-    title: 'Hot Deals This Week 🔥',
-    image: '/uploads/banner2.jpg',
-    link: '/deals'
-  }
-];
-
-let categories = [
-  { id: '1', name: 'Business leads', icon: '📊', color: '#3B82F6' },
-  { id: '2', name: 'Crypto',          icon: '💰', color: '#F59E0B' },
-  { id: '3', name: 'Courses',         icon: '📚', color: '#EF4444' },
-  { id: '4', name: 'Software',        icon: '⚙️', color: '#10B981' },
-  { id: '5', name: 'Design',          icon: '🎨', color: '#8B5CF6' },
-  { id: '6', name: 'Lifestyle',       icon: '🌿', color: '#EC4899' }
-];
-
-let settings = {
-  appTitle: 'Digital Marketplace',
-  appSubtitle: 'Sell Leads Easily',
-  accent: '#F0B90B',
-  wallets: {
-    btc: process.env.BTC_ADDRESS || '',
-    eth: process.env.ETH_ADDRESS || '',
-    usdt_trc20: process.env.USDT_ADDRESS || ''
-  }
-};
-
 // --- Settings Routes ---
-app.get('/api/settings', (req, res) => res.json(settings));
-app.patch('/api/settings', (req, res) => {
-  settings = { ...settings, ...req.body };
-  io.emit('settings-updated', settings);
-  res.json(settings);
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await settingsCollection.findOne({});
+    res.json(settings || {});
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/settings', async (req, res) => {
+  try {
+    const result = await settingsCollection.updateOne(
+      {},
+      { $set: req.body },
+      { upsert: true }
+    );
+    const updatedSettings = await settingsCollection.findOne({});
+    io.emit('settings-updated', updatedSettings);
+    res.json(updatedSettings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- Category Routes ---
-app.get('/api/categories', (req, res) => res.json(categories));
-app.post('/api/categories', (req, res) => {
-  const { name, icon = '🗂️', color = '#64748B' } = req.body || {};
-  const trimmed = (name || '').trim();
-  if (!trimmed) return res.status(400).json({ success: false, error: 'Name required' });
-
-  const exists = categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase());
-  if (exists) return res.status(409).json({ success: false, error: 'Category exists' });
-
-  const category = { id: Date.now().toString(), name: trimmed, icon, color };
-  categories.push(category);
-  io.emit('category-added', category);
-  res.status(201).json({ success: true, category });
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await categoriesCollection.find({}).toArray();
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.patch('/api/categories/:id', (req, res) => {
-  const { id } = req.params;
-  const idx = categories.findIndex(c => c.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Not found' });
 
-  categories[idx] = { ...categories[idx], ...req.body };
-  io.emit('category-updated', categories[idx]);
-  res.json({ success: true, category: categories[idx] });
+app.post('/api/categories', async (req, res) => {
+  try {
+    const { name, icon = '🗂️', color = '#64748B' } = req.body || {};
+    const trimmed = (name || '').trim();
+    
+    if (!trimmed) {
+      return res.status(400).json({ success: false, error: 'Name required' });
+    }
+
+    const exists = await categoriesCollection.findOne({ 
+      name: { $regex: new RegExp(trimmed, 'i') } 
+    });
+    
+    if (exists) {
+      return res.status(409).json({ success: false, error: 'Category exists' });
+    }
+
+    const category = { 
+      _id: new ObjectId(), 
+      name: trimmed, 
+      icon, 
+      color 
+    };
+    
+    await categoriesCollection.insertOne(category);
+    io.emit('category-added', category);
+    res.status(201).json({ success: true, category });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.delete('/api/categories/:id', (req, res) => {
-  const { id } = req.params;
-  categories = categories.filter(c => c.id !== id);
-  io.emit('category-deleted', id);
-  res.json({ success: true });
+
+app.patch('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await categoriesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const updatedCategory = await categoriesCollection.findOne({ _id: new ObjectId(id) });
+    io.emit('category-updated', updatedCategory);
+    res.json({ success: true, category: updatedCategory });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await categoriesCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
+    io.emit('category-deleted', id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- Product Routes ---
-app.get('/api/products', (req, res) => res.json(products));
-app.post('/api/products', (req, res) => {
-  const product = { id: Date.now().toString(), ...req.body };
-  products.push(product);
-  io.emit('product-added', product);
-  res.status(201).json(product);
+app.get('/api/products', async (req, res) => {
+  try {
+    const products = await productsCollection.find({}).toArray();
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.patch('/api/products/:id', (req, res) => {
-  const { id } = req.params;
-  const idx = products.findIndex(p => p.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Not found' });
 
-  products[idx] = { ...products[idx], ...req.body };
-  io.emit('product-updated', products[idx]);
-  res.json(products[idx]);
+app.post('/api/products', async (req, res) => {
+  try {
+    const product = { 
+      _id: new ObjectId(), 
+      ...req.body 
+    };
+    
+    await productsCollection.insertOne(product);
+    io.emit('product-added', product);
+    res.status(201).json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.delete('/api/products/:id', (req, res) => {
-  const { id } = req.params;
-  products = products.filter(p => p.id !== id);
-  io.emit('product-deleted', id);
-  res.json({ success: true });
+
+app.patch('/api/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const updatedProduct = await productsCollection.findOne({ _id: new ObjectId(id) });
+    io.emit('product-updated', updatedProduct);
+    res.json(updatedProduct);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
+    io.emit('product-deleted', id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- Banner Routes ---
-app.get('/api/banners', (req, res) => res.json(banners));
-app.post('/api/banners', (req, res) => {
-  const banner = { id: Date.now().toString(), ...req.body };
-  banners.push(banner);
-  io.emit('banner-added', banner);
-  res.status(201).json(banner);
+app.get('/api/banners', async (req, res) => {
+  try {
+    const banners = await bannersCollection.find({}).toArray();
+    res.json(banners);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.patch('/api/banners/:id', (req, res) => {
-  const { id } = req.params;
-  const idx = banners.findIndex(b => b.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Not found' });
 
-  banners[idx] = { ...banners[idx], ...req.body };
-  io.emit('banner-updated', banners[idx]);
-  res.json(banners[idx]);
+app.post('/api/banners', async (req, res) => {
+  try {
+    const banner = { 
+      _id: new ObjectId(), 
+      ...req.body 
+    };
+    
+    await bannersCollection.insertOne(banner);
+    io.emit('banner-added', banner);
+    res.status(201).json(banner);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-app.delete('/api/banners/:id', (req, res) => {
-  const { id } = req.params;
-  banners = banners.filter(b => b.id !== id);
-  io.emit('banner-deleted', id);
-  res.json({ success: true });
+
+app.patch('/api/banners/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await bannersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const updatedBanner = await bannersCollection.findOne({ _id: new ObjectId(id) });
+    io.emit('banner-updated', updatedBanner);
+    res.json(updatedBanner);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/banners/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await bannersCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
+    io.emit('banner-deleted', id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- HTTP + WebSocket Setup ---
@@ -188,41 +321,69 @@ io.on('connection', (socket) => {
 });
 
 // --- Purchases Route ---
-let purchases = [
-  {
-    id: 'order1',
-    userId: 'user_abc123',
-    productName: 'Crypto Leads Pack',
-    status: 'completed',
-    files: [
-      { url: '/uploads/crypto-leads.csv', name: 'crypto-leads.csv' }
-    ]
-  },
-  {
-    id: 'order2',
-    userId: 'user_xyz789',
-    productName: 'Design Templates',
-    status: 'pending',
-    files: []
+app.get('/api/purchases', async (req, res) => {
+  try {
+    const { status, userId } = req.query;
+    let query = {};
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (userId) {
+      query.userId = userId;
+    }
+
+    const purchases = await purchasesCollection.find(query).toArray();
+    res.json(purchases);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-];
+});
 
-app.get('/api/purchases', (req, res) => {
-  const { status, userId } = req.query;
-  let filtered = purchases;
-
-  if (status) {
-    filtered = filtered.filter(p => p.status === status);
+app.post('/api/purchases', async (req, res) => {
+  try {
+    const purchase = {
+      _id: new ObjectId(),
+      ...req.body,
+      createdAt: new Date()
+    };
+    
+    await purchasesCollection.insertOne(purchase);
+    res.status(201).json(purchase);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
+});
 
-  if (userId) {
-    filtered = filtered.filter(p => p.userId === userId);
+app.patch('/api/purchases/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await purchasesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const updatedPurchase = await purchasesCollection.findOne({ _id: new ObjectId(id) });
+    io.emit('purchase-updated', updatedPurchase);
+    res.json(updatedPurchase);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json(filtered);
 });
 
 server.listen(basePort, () => {
   const publicURL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${basePort}`;
   console.log(`🚀 API + WebSocket running at ${publicURL}`);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...');
+  await client.close();
+  process.exit(0);
 });
