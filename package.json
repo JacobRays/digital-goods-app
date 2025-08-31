@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,7 +13,8 @@
     "clean-deploy": "vercel --force --prod",
     "server": "node server.js",
     "dev-with-backend": "concurrently \"npm run server\" \"npm run dev\"",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev-server": "nodemon server.js"
   },
   "dependencies": {
     "concurrently": "^8.2.2",
@@ -18,6 +22,7 @@
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
     "fs-extra": "^11.3.1",
+    "mongodb": "^6.8.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0",
