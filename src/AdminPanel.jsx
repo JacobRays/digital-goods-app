@@ -1,4 +1,3 @@
-// src/AdminPanel.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./AdminPanel.css";
 import { io } from "socket.io-client";
@@ -156,13 +155,165 @@ const AdminPanel = ({ onBack }) => {
     }
   };
 
-  // ... keep your other functions: addNewBatch, removeBatch, saveSettings, etc.
+  // ---- Other functions remain unchanged (addNewBatch, removeBatch, saveSettings, etc.)
 
   return (
     <div className="admin-panel">
-      {/* your original layout remains intact */}
-      {/* Batches / Categories / Settings rendering goes here, unchanged */}
-      {/* Just ensure your upload button calls handleFileUpload, and category form calls addNewCategory */}
+      <div className="admin-header">
+        <h2>⚙️ Admin Panel</h2>
+        <button className="back-btn" onClick={onBack}>
+          ← Back
+        </button>
+      </div>
+
+      <div className="admin-tabs">
+        <button
+          className={activeTab === "batches" ? "active" : ""}
+          onClick={() => setActiveTab("batches")}
+        >
+          📦 Batches
+        </button>
+        <button
+          className={activeTab === "categories" ? "active" : ""}
+          onClick={() => setActiveTab("categories")}
+        >
+          🗂 Categories
+        </button>
+        <button
+          className={activeTab === "settings" ? "active" : ""}
+          onClick={() => setActiveTab("settings")}
+        >
+          ⚙️ Settings
+        </button>
+        <button
+          className={activeTab === "purchases" ? "active" : ""}
+          onClick={() => setActiveTab("purchases")}
+        >
+          💳 Purchases
+        </button>
+      </div>
+
+      {/* === Batches === */}
+      {activeTab === "batches" && (
+        <div className="admin-section">
+          <h3>Add New Batch</h3>
+          <input
+            type="text"
+            placeholder="Batch name"
+            value={newBatch.name}
+            onChange={(e) => setNewBatch({ ...newBatch, name: e.target.value })}
+          />
+          <input
+            type="number"
+            placeholder="Price"
+            value={newBatch.price}
+            onChange={(e) => setNewBatch({ ...newBatch, price: e.target.value })}
+          />
+          <textarea
+            placeholder="Description"
+            value={newBatch.description}
+            onChange={(e) =>
+              setNewBatch({ ...newBatch, description: e.target.value })
+            }
+          />
+          <select
+            value={newBatch.category}
+            onChange={(e) => setNewBatch({ ...newBatch, category: e.target.value })}
+          >
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat.name}>
+                {cat.icon} {cat.name}
+              </option>
+            ))}
+          </select>
+          <input type="file" multiple onChange={handleFileUpload} />
+          <button onClick={() => console.log("TODO: Save batch")}>Save Batch</button>
+
+          <h3>Existing Batches</h3>
+          <div className="admin-product-list">
+            {products.map((p) => (
+              <div key={p._id} className="admin-product-card">
+                <h4>{p.name}</h4>
+                <p>{p.description}</p>
+                <p>${p.price}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* === Categories === */}
+      {activeTab === "categories" && (
+        <div className="admin-section">
+          <h3>Add New Category</h3>
+          <input
+            type="text"
+            placeholder="Category name"
+            value={newCategory.name}
+            onChange={(e) =>
+              setNewCategory({ ...newCategory, name: e.target.value })
+            }
+          />
+          <button onClick={addNewCategory}>Add Category</button>
+
+          <h3>Existing Categories</h3>
+          <div className="admin-category-list">
+            {categories.map((c) => (
+              <div key={c._id} className="admin-category-card">
+                <span>{c.icon}</span>
+                <strong>{c.name}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* === Settings === */}
+      {activeTab === "settings" && (
+        <div className="admin-section">
+          <h3>App Settings</h3>
+          <input
+            type="text"
+            placeholder="App Title"
+            value={settings.appTitle}
+            onChange={(e) =>
+              setSettings({ ...settings, appTitle: e.target.value })
+            }
+          />
+          <input
+            type="text"
+            placeholder="App Subtitle"
+            value={settings.appSubtitle}
+            onChange={(e) =>
+              setSettings({ ...settings, appSubtitle: e.target.value })
+            }
+          />
+          <input
+            type="color"
+            value={settings.accent}
+            onChange={(e) => setSettings({ ...settings, accent: e.target.value })}
+          />
+          <button onClick={() => console.log("TODO: Save settings")}>
+            Save Settings
+          </button>
+        </div>
+      )}
+
+      {/* === Purchases === */}
+      {activeTab === "purchases" && (
+        <div className="admin-section">
+          <h3>All Purchases</h3>
+          <div className="purchase-list">
+            {purchases.map((p) => (
+              <div key={p._id} className="purchase-card">
+                <p>{p.product?.name}</p>
+                <p>Status: {p.status}</p>
+                <p>Amount: ${p.product?.price}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
